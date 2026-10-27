@@ -1,8 +1,20 @@
-# mdedit
+# MDEdit
+
 
 A Markdown editor with a live, GitHub-styled preview and PDF export, written
 in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and
 Wayland), FreeBSD, macOS and Windows.
+
+<!-- toc -->
+
+- [MDEdit](#mdedit)
+  - [Building](#building)
+  - [Usage](#usage)
+    - [Maths](#maths)
+  - [Supported Markdown](#supported-markdown)
+  - [Layout](#layout)
+
+<!-- /toc -->
 
 ## Building
 
@@ -64,6 +76,17 @@ shown in red. In PDFs, maths is drawn as vector outlines, so it isn't
 selectable as text.
 
 Insert → Math Block (Ctrl+Shift+M) and Format → Inline Math add the markup.
+
+Example 1:
+$$
+E=mc^2
+$$
+Example 2:
+$$
+\sqrt{a}=b \qquad \text{iff} \quad b^2=a \
+$$
+
+## Fenced blocks (code blocks)
 
 Fenced code blocks are highlighted by the language after the fence
 (` ```go `, ` ```bash `, ` ```C# `, ` ```c++ `, ` ```yaml `, ` ```{.python} `

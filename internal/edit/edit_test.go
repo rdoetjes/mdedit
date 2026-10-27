@@ -178,3 +178,31 @@ func TestMath(t *testing.T) {
 	check(t, "block", MathBlock(st(t, "text|")), "text\n\n$$\n|\n$$\n")
 	check(t, "wrap block", MathBlock(st(t, "[a = b]")), "$$\n[a = b]\n$$")
 }
+
+// Regression: markers mentioned in prose or code must not be taken for a
+// table of contents (README.md describes them inline).
+func TestTOCMarkersInText(t *testing.T) {
+	for _, doc := range []string{
+		"# A\n\nUse `<!-- toc -->` and `<!-- /toc -->` markers.\n\n## B\n",
+		"# A\n\n```\n<!-- toc -->\n<!-- /toc -->\n```\n\n## B\n",
+		"# A\n\n~~~md\n<!-- toc -->\n~~~\n<!-- /toc -->\n\n## B\n",
+	} {
+		s := New(doc, 3, 3) // caret at the end of "# A"
+		if _, _, ok := FindTOC(s); ok {
+			t.Errorf("FindTOC found a TOC in %q", doc)
+		}
+		out := InsertTOC(s).String()
+		if !strings.HasPrefix(out, "# A\n\n"+TOCStart+"\n\n- [A](#a)\n  - [B](#b)\n\n"+TOCEnd+"\n\n") {
+			t.Errorf("TOC not inserted after the title:\n%s", out)
+		}
+		if !strings.HasSuffix(out, doc[3:]) {
+			t.Errorf("the rest of the document changed:\n%s", out)
+		}
+	}
+	// A real TOC is still found even when the text also mentions markers.
+	doc := "Use `<!-- toc -->` here.\n\n  <!-- toc -->\n- old\n<!-- /toc -->\n\n# X\n"
+	upd := UpdateTOC(New(doc, 0, 0)).String()
+	if !strings.Contains(upd, "Use `<!-- toc -->` here.") || !strings.Contains(upd, "- [X](#x)") || strings.Contains(upd, "- old") {
+		t.Errorf("update with mentions:\n%s", upd)
+	}
+}

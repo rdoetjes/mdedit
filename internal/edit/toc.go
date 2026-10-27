@@ -61,19 +61,36 @@ func tocBlock(text string) string {
 
 // FindTOC returns the rune range of the table of contents, from the start of
 // its opening marker to the end of its closing marker.
+//
+// Markers only count on a line of their own and outside fenced code, so a
+// document that merely mentions them (like mdedit's README) isn't mistaken
+// for one with a table of contents.
 func FindTOC(s State) (from, to int, ok bool) {
-	t := string(s.Text)
-	i := strings.Index(t, TOCStart)
-	if i < 0 {
-		return 0, 0, false
+	start := -1
+	fence := ""
+	pos := 0 // rune offset of the current line
+	for _, line := range strings.Split(string(s.Text), "\n") {
+		n := len([]rune(line))
+		t := strings.TrimSpace(line)
+		switch {
+		case fence != "":
+			if strings.HasPrefix(t, fence) && strings.Trim(t, fence[:1]) == "" {
+				fence = ""
+			}
+		case strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~"):
+			fence = t[:3]
+			for len(fence) < len(t) && t[len(fence)] == fence[0] {
+				fence += fence[:1]
+			}
+		case t == TOCStart && start < 0:
+			start = pos + len([]rune(line[:strings.Index(line, TOCStart)]))
+		case t == TOCEnd && start >= 0:
+			end := pos + len([]rune(line[:strings.Index(line, TOCEnd)])) + len([]rune(TOCEnd))
+			return start, end, true
+		}
+		pos += n + 1
 	}
-	j := strings.Index(t[i:], TOCEnd)
-	if j < 0 {
-		return 0, 0, false
-	}
-	from = len([]rune(t[:i]))
-	to = len([]rune(t[:i+j+len(TOCEnd)]))
-	return from, to, true
+	return 0, 0, false
 }
 
 // InsertTOC inserts a table of contents at the caret, or updates the
