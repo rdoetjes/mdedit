@@ -44,6 +44,7 @@ test:
 install: build
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(BIN) $(DESTDIR)$(PREFIX)/bin/mdedit
+	./make-desktop.sh
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/mdedit
