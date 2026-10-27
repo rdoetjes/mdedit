@@ -87,6 +87,10 @@ Example 2:
 $$
 \sqrt{a}=b \qquad \text{iff} \quad b^2=a \
 $$
+Example 3:
+$$
+\sqrt{e}\, \sqrt{T}\,\sqrt{T^2_1}
+$$
 
 ## Fenced blocks (code blocks)
 
