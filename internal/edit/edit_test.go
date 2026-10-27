@@ -171,3 +171,10 @@ func TestTOC(t *testing.T) {
 		t.Error("anchor #b missing")
 	}
 }
+
+func TestMath(t *testing.T) {
+	check(t, "inline", ToggleInline(st(t, "a [x^2] b"), InlineMath), "a $[x^2]$ b")
+	check(t, "un-inline", ToggleInline(st(t, "a $[x^2]$ b"), InlineMath), "a [x^2] b")
+	check(t, "block", MathBlock(st(t, "text|")), "text\n\n$$\n|\n$$\n")
+	check(t, "wrap block", MathBlock(st(t, "[a = b]")), "$$\n[a = b]\n$$")
+}

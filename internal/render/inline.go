@@ -7,11 +7,13 @@ import (
 	"unicode/utf8"
 
 	"mdedit/internal/mdmodel"
+	"mdedit/internal/tex"
 )
 
 // inlineItem is a span prepared for layout.
 type inlineItem struct {
 	span  mdmodel.Span
+	math  *tex.Box // inline maths, drawn at size*mathScale
 	font  FontSpec
 	size  float32
 	color color.NRGBA
@@ -46,6 +48,9 @@ func (c *Ctx) items(spans []mdmodel.Span, size float32, col color.NRGBA, code bo
 		}
 		if s.Mono && !code {
 			it.size = size * codeScale
+		}
+		if s.Math {
+			it.math = tex.Layout(s.Text, s.Display)
 		}
 		if code {
 			it.span.Text = strings.ReplaceAll(s.Text, "\t", "    ")
@@ -145,6 +150,16 @@ func (c *Ctx) layoutInline(items []inlineItem, maxW, strut, lineHeight float32, 
 	}
 
 	for i, it := range items {
+		if it.math != nil {
+			// A formula is a single unbreakable box.
+			ms := it.size * mathScale
+			m := Metrics{Width: it.math.W * ms, Ascent: it.math.H * ms, Descent: it.math.D * ms}
+			if x > 0 && x+m.Width > maxW {
+				finish()
+			}
+			place(i, "", m)
+			continue
+		}
 		measure := func(s string) Metrics { return c.Measure(it.font, it.size, s) }
 		for _, t := range tokens(it.span.Text) {
 			if t == "\n" {
@@ -219,6 +234,13 @@ func (c *Ctx) emitLines(l *Layout, items []inlineItem, lines []line, ox, oy, w f
 			it := items[r.item]
 			x := ox + shift + r.x
 			base := oy + ln.baseline
+			if it.math != nil {
+				l.Prims = c.mathPrims(l.Prims, it.math, it.size*mathScale, x, base, it.color)
+				if it.span.Link != "" {
+					l.Prims = append(l.Prims, Prim{Kind: PLink, X: x, Y: oy + ln.top, W: r.w, H: ln.height, URL: it.span.Link})
+				}
+				continue
+			}
 			if it.span.Mono && !code {
 				pad := 0.2 * it.size
 				txt := strings.TrimRightFunc(r.text, unicode.IsSpace)

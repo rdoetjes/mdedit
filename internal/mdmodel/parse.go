@@ -17,7 +17,7 @@ import (
 )
 
 var md = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithExtensions(extension.GFM, mathExtension{}),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 )
 
@@ -139,9 +139,15 @@ func (b *builder) block(n ast.Node) {
 		}
 		spans := b.inlines(n)
 		b.emit(n, Block{Kind: Paragraph, Spans: spans}, isText)
+	case *mathBlock:
+		b.emit(n, Block{Kind: Math, Spans: []Span{{Text: b.lines(n.Lines()), Math: true, Display: true}}}, false)
 	case *ast.FencedCodeBlock:
 		lang := string(n.Language(b.src))
 		code := b.lines(n.Lines())
+		if lang == "math" { // GitHub's ```math blocks
+			b.emit(n, Block{Kind: Math, Spans: []Span{{Text: code, Math: true, Display: true}}}, false)
+			return
+		}
 		b.emit(n, Block{Kind: Code, Lang: lang, Spans: Highlight(lang, code)}, false)
 	case *ast.CodeBlock:
 		code := b.lines(n.Lines())
@@ -384,6 +390,11 @@ func (b *builder) inline(n ast.Node, st Span, out *[]Span) {
 			case "code", "kbd":
 				st.Mono = !closing || base.Mono
 			}
+		case *mathInline:
+			s := st
+			s.Math, s.Display = true, c.display
+			s.Text = string(c.value)
+			*out = append(*out, s)
 		case *east.Strikethrough:
 			s := st
 			s.Strike = true

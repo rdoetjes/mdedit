@@ -11,6 +11,7 @@ import (
 	"image/color"
 
 	"mdedit/internal/mdmodel"
+	"mdedit/internal/tex"
 )
 
 // FontSpec selects one of the eight faces of the Go font family.
@@ -48,6 +49,8 @@ const (
 	PText
 	PImage
 	PLink
+	PGlyph // a maths glyph outline from package tex
+	PPoly  // a filled polygon
 )
 
 // Prim is a positioned drawing primitive. Coordinates are relative to the
@@ -62,6 +65,12 @@ type Prim struct {
 	Font       FontSpec
 	Size       float32
 	URL        string // PLink target; PImage source
+	// PGlyph: the glyph is drawn at (X, Y) on the baseline with em size
+	// Size, stretched by XScale and YScale.
+	Face           uint8
+	Glyph          uint16
+	XScale, YScale float32
+	Points         [][2]float32 // PPoly
 }
 
 // Top returns the highest y coordinate the primitive covers.
@@ -71,6 +80,14 @@ func (p *Prim) Top() float32 {
 		return p.Y - p.Size
 	case PLine:
 		return min(p.Y, p.H)
+	case PGlyph:
+		return p.Y - p.Size
+	case PPoly:
+		t := p.Points[0][1]
+		for _, q := range p.Points {
+			t = min(t, q[1])
+		}
+		return t
 	}
 	return p.Y
 }
@@ -89,6 +106,7 @@ type Theme struct {
 	Text, Muted, Link, Border color.NRGBA
 	CodeBg, InlineCodeBg      color.NRGBA
 	TableAltBg, CheckFill, Bg color.NRGBA
+	Error                     color.NRGBA
 }
 
 func rgb(c uint32) color.NRGBA {
@@ -106,6 +124,7 @@ var Light = Theme{
 	TableAltBg:   rgb(0xf6f8fa),
 	CheckFill:    rgb(0x0969da),
 	Bg:           rgb(0xffffff),
+	Error:        rgb(0xcf222e),
 }
 
 // Heading font sizes relative to the base size, as on GitHub.
@@ -164,6 +183,8 @@ func (c *Ctx) Block(b, prev *mdmodel.Block, width float32) *Layout {
 		content, firstBaseline = c.table(b.Table, cw, textColor)
 	case mdmodel.Image:
 		content, firstBaseline = c.image(b, cw, textColor)
+	case mdmodel.Math:
+		content, firstBaseline = c.mathBlock(b, cw, textColor)
 	default:
 		content, firstBaseline = c.paragraph(b.Spans, cw, textColor, b.Align)
 	}
@@ -172,9 +193,16 @@ func (c *Ctx) Block(b, prev *mdmodel.Block, width float32) *Layout {
 	for _, p := range content.Prims {
 		p.X += x0
 		p.Y += gap
-		if p.Kind == PLine {
+		switch p.Kind {
+		case PLine:
 			p.W += x0
 			p.H += gap
+		case PPoly:
+			pts := make([][2]float32, len(p.Points))
+			for i, q := range p.Points {
+				pts[i] = [2]float32{q[0] + x0, q[1] + gap}
+			}
+			p.Points = pts
 		}
 		out.Prims = append(out.Prims, p)
 	}
@@ -401,4 +429,57 @@ func firstBaseline(lines []line, size float32) float32 {
 		return size
 	}
 	return lines[0].baseline
+}
+
+// mathScale enlarges maths slightly so STIX Two matches the Go text font.
+const mathScale = 1.08
+
+func (c *Ctx) mathBlock(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, float32) {
+	src := ""
+	if len(b.Spans) > 0 {
+		src = b.Spans[0].Text
+	}
+	box := tex.Layout(src, true)
+	size := c.Em * mathScale
+	if box.W*size > w && box.W > 0 {
+		size = w / box.W // shrink formulas wider than the page
+	}
+	pad := 0.25 * c.Em
+	x := (w - box.W*size) / 2
+	switch b.Align {
+	case mdmodel.AlignLeft:
+		x = 0
+	case mdmodel.AlignRight:
+		x = w - box.W*size
+	}
+	baseline := pad + box.H*size
+	l := &Layout{Height: baseline + box.D*size + pad}
+	l.Prims = c.mathPrims(l.Prims, box, size, x, baseline, col)
+	return l, baseline
+}
+
+// mathPrims converts a typeset formula into primitives, with its origin at
+// (x, baseline) and em size size.
+func (c *Ctx) mathPrims(out []Prim, box *tex.Box, size, x, baseline float32, col color.NRGBA) []Prim {
+	for _, it := range box.Items {
+		ic := col
+		if it.Error {
+			ic = c.Theme.Error
+		}
+		switch it.Kind {
+		case tex.ItemGlyph:
+			out = append(out, Prim{Kind: PGlyph, X: x + it.X*size, Y: baseline + it.Y*size, Size: it.Size * size,
+				Face: it.Face, Glyph: it.Glyph, XScale: it.XScale, YScale: it.YScale, Color: ic})
+		case tex.ItemRule:
+			out = append(out, Prim{Kind: PRect, X: x + it.X*size, Y: baseline + it.Y*size,
+				W: it.W * size, H: max(it.H*size, 0.5), Color: ic})
+		case tex.ItemPoly:
+			pts := make([][2]float32, len(it.Points))
+			for i, p := range it.Points {
+				pts[i] = [2]float32{x + p[0]*size, baseline + p[1]*size}
+			}
+			out = append(out, Prim{Kind: PPoly, Points: pts, Color: ic})
+		}
+	}
+	return out
 }

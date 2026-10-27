@@ -54,7 +54,19 @@
       "Bash(sips -c 400 1000 /tmp/mdout/p1.png --out /tmp/mdout/p1crop.png)",
       "Bash(make test *)",
       "Bash(GOTOOLCHAIN=local go test ./internal/edit)",
-      "Bash(./bin/mdedit -pdf /tmp/mdout/toc.md)"
+      "Bash(./bin/mdedit -pdf /tmp/mdout/toc.md)",
+      "Bash(mkdir -p /tmp/mdfonts)",
+      "Bash(curl -sSL https://api.github.com/repos/stipub/stixfonts/contents/fonts/static_ttf)",
+      "Bash(curl -sSL https://api.github.com/repos/stipub/stixfonts/contents/fonts)",
+      "Bash(curl -sSL https://api.github.com/repos/stipub/stixfonts/git/trees/master?recursive=1)",
+      "Bash(curl -sSL \"https://api.github.com/repos/stipub/stixfonts/git/trees/master?recursive=1\")",
+      "Bash(curl -sSL https://api.github.com/repos/stipub/stixfonts/releases/latest)",
+      "Bash(GOTOOLCHAIN=local go vet ./internal/render)",
+      "Bash(sed -i '' 's|^\\\\t\"mdedit/internal/render\"$|\\\\t\"mdedit/internal/render\"\\\\n\\\\t\"mdedit/internal/tex\"|' internal/ui/preview.go)",
+      "Bash(grep -n \"for _, p := range content.Prims {\" -A8 internal/render/render.go)",
+      "Bash(GOTOOLCHAIN=local go test ./internal/tex)",
+      "Bash(CC=clang GOTOOLCHAIN=local MDEDIT_SHOT=/tmp/mdout go test ./internal/ui -run TestScreenshot)",
+      "Bash(sed -i '' 's|format\\(\"Inline Math\", \"M\", 0, inline\\(edit.InlineMath\\)\\)|format\\(\"Inline Math\", \"\", 0, inline\\(edit.InlineMath\\)\\)|' internal/ui/commands.go)"
     ]
   }
 }

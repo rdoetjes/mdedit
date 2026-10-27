@@ -606,3 +606,18 @@ func Outdent(s State) State {
 		return l[n:]
 	})
 }
+
+// InlineMath is the marker pair for inline maths.
+var InlineMath = [2]string{"$", "$"}
+
+// MathBlock wraps the selected lines in $$ … $$, or inserts an empty maths
+// block with the caret inside.
+func MathBlock(s State) State {
+	if s.Start != s.End {
+		from, to := s.selectedLines()
+		body := string(s.Text[from:to])
+		block := "$$\n" + body + "\n$$"
+		return s.replace(from, to, block, from+3, from+3+len([]rune(body)))
+	}
+	return ownLine(s, "$$\n\n$$", 3, 3)
+}

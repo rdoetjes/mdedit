@@ -22,6 +22,7 @@ import (
 
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
+	"mdedit/internal/tex"
 )
 
 // Preview renders a parsed document.
@@ -192,6 +193,44 @@ func (p *Preview) paint(gtx layout.Context, l *render.Layout, ox float32) {
 				cl.Pop()
 				st.Pop()
 			}
+		case render.PGlyph:
+			segs := tex.Outline(pr.Face, pr.Glyph)
+			if len(segs) == 0 {
+				continue
+			}
+			sx, sy := pr.Size*pr.XScale, pr.Size*pr.YScale
+			pt := func(p [2]float32) f32.Point { return f32.Pt(x+p[0]*sx, pr.Y+p[1]*sy) }
+			var path clip.Path
+			path.Begin(ops)
+			for i, s := range segs {
+				switch s.Op {
+				case tex.MoveTo:
+					if i > 0 {
+						path.Close()
+					}
+					path.MoveTo(pt(s.P[0]))
+				case tex.LineTo:
+					path.LineTo(pt(s.P[0]))
+				case tex.QuadTo:
+					path.QuadTo(pt(s.P[0]), pt(s.P[1]))
+				case tex.CubeTo:
+					path.CubeTo(pt(s.P[0]), pt(s.P[1]), pt(s.P[2]))
+				}
+			}
+			path.Close()
+			paint.FillShape(ops, pr.Color, clip.Outline{Path: path.End()}.Op())
+		case render.PPoly:
+			var path clip.Path
+			path.Begin(ops)
+			for i, p := range pr.Points {
+				if i == 0 {
+					path.MoveTo(f32.Pt(p[0]+ox, p[1]))
+				} else {
+					path.LineTo(f32.Pt(p[0]+ox, p[1]))
+				}
+			}
+			path.Close()
+			paint.FillShape(ops, pr.Color, clip.Outline{Path: path.End()}.Op())
 		case render.PLink:
 			area := clip.Rect(image.Rect(rnd(x), rnd(pr.Y), rnd(x+pr.W), rnd(pr.Y+pr.H))).Push(ops)
 			pointer.CursorPointer.Add(ops)

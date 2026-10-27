@@ -17,12 +17,15 @@ type Span struct {
 	Mono      bool // inline code, or any text inside a code block
 	Strike    bool
 	Underline bool
+	// Math spans hold TeX source in Text; Display selects display style.
+	Math    bool
+	Display bool
 	Link      string      // link target; empty if not a link
 	Color     color.NRGBA // syntax-highlight colour; zero means the default colour
 }
 
 func (s Span) sameStyle(o Span) bool {
-	return s.Bold == o.Bold && s.Italic == o.Italic && s.Mono == o.Mono &&
+	return !s.Math && !o.Math && s.Bold == o.Bold && s.Italic == o.Italic && s.Mono == o.Mono &&
 		s.Strike == o.Strike && s.Underline == o.Underline && s.Link == o.Link && s.Color == o.Color
 }
 
@@ -36,6 +39,7 @@ const (
 	Table
 	Image
 	HTML // raw HTML block, shown verbatim
+	Math // display maths; the TeX source is in Spans[0].Text
 )
 
 type DecorKind int

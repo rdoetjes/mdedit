@@ -46,6 +46,25 @@ and the convention markdown-toc and VS Code use). Right-click in the editor
 or preview and choose Update Table of Contents to regenerate it after
 editing headings; the right-click menu also has Cut, Copy and Paste.
 
+### Maths
+
+Display maths goes between `$$` lines (or ` ```math ` fences, as on GitHub);
+inline maths between single dollars: `$e^{i\pi} + 1 = 0$`. As in Pandoc and
+Typora, `$` followed by a space, or a closing `$` before a digit, isn't
+maths, so `$5 and $10` stays text; write `\$` for a literal dollar sign.
+
+mdedit typesets maths itself (no JavaScript, no network) with the STIX Two
+Math font (SIL Open Font License, embedded): fractions, roots, sub- and
+superscripts, large operators with limits, stretchy `\left … \right`
+delimiters, accents, Greek and symbols, `\text`, `\mathbb` / `\mathcal` /
+`\mathbf` …, and the `matrix` / `pmatrix` / `bmatrix` / `vmatrix`, `cases`,
+`aligned` and `array` environments. Lines separated by `\\` (with `&`
+alignment points) work without an environment too. Unknown commands are
+shown in red. In PDFs, maths is drawn as vector outlines, so it isn't
+selectable as text.
+
+Insert → Math Block (Ctrl+Shift+M) and Format → Inline Math add the markup.
+
 Fenced code blocks are highlighted by the language after the fence
 (` ```go `, ` ```bash `, ` ```C# `, ` ```c++ `, ` ```yaml `, ` ```{.python} `
 …), covering about 250 languages and their usual aliases.

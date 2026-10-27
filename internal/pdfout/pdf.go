@@ -19,6 +19,7 @@ import (
 
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
+	"mdedit/internal/tex"
 )
 
 // Options control the page setup.
@@ -237,6 +238,57 @@ func (e *exporter) draw(l *render.Layout, y0, y1, dy float32) {
 			pdf.SetDrawColor(int(p.Color.R), int(p.Color.G), int(p.Color.B))
 			pdf.SetLineCapStyle("round")
 			pdf.Line(float64(e.left+p.X), float64(p.Y+dy), float64(e.left+p.W), float64(p.H+dy))
+		case render.PGlyph:
+			if p.Y <= y0 || p.Y > y1 {
+				continue
+			}
+			segs := tex.Outline(p.Face, p.Glyph)
+			if len(segs) == 0 {
+				continue
+			}
+			sx, sy := p.Size*p.XScale, p.Size*p.YScale
+			pt := func(q [2]float32) (float64, float64) {
+				return float64(e.left + p.X + q[0]*sx), float64(p.Y + dy + q[1]*sy)
+			}
+			pdf.SetFillColor(int(p.Color.R), int(p.Color.G), int(p.Color.B))
+			for i, s := range segs {
+				switch s.Op {
+				case tex.MoveTo:
+					if i > 0 {
+						pdf.ClosePath()
+					}
+					pdf.MoveTo(pt(s.P[0]))
+				case tex.LineTo:
+					pdf.LineTo(pt(s.P[0]))
+				case tex.QuadTo:
+					cx, cy := pt(s.P[0])
+					x, y := pt(s.P[1])
+					pdf.CurveTo(cx, cy, x, y)
+				case tex.CubeTo:
+					c1x, c1y := pt(s.P[0])
+					c2x, c2y := pt(s.P[1])
+					x, y := pt(s.P[2])
+					pdf.CurveBezierCubicTo(c1x, c1y, c2x, c2y, x, y)
+				}
+			}
+			pdf.ClosePath()
+			pdf.DrawPath("F")
+		case render.PPoly:
+			cy := (p.Top() + p.Points[len(p.Points)/2][1]) / 2
+			if cy <= y0 || cy > y1 {
+				continue
+			}
+			pdf.SetFillColor(int(p.Color.R), int(p.Color.G), int(p.Color.B))
+			for i, q := range p.Points {
+				x, y := float64(e.left+q[0]), float64(q[1]+dy)
+				if i == 0 {
+					pdf.MoveTo(x, y)
+				} else {
+					pdf.LineTo(x, y)
+				}
+			}
+			pdf.ClosePath()
+			pdf.DrawPath("F")
 		case render.PImage:
 			if p.Y < y0 || p.Y >= y1 {
 				continue

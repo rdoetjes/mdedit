@@ -188,6 +188,14 @@ func TestScreenshot(t *testing.T) {
 	h.a.preview.ScrollToBlock(0)
 	shot("highlight.png")
 
+	if src, err := os.ReadFile("/tmp/mdout/maths.md"); err == nil {
+		h.setText(string(src), 0, 0)
+		h.a.view = viewPreview
+		h.a.preview.ScrollToBlock(0)
+		shot("maths.png")
+		h.a.view = viewSplit
+	}
+
 	h.setText("# Guide\n\n## Install\n\n### Linux\n\n### FreeBSD\n\n## Usage\n\n### Shortcuts\n\n## Licence\n", 0, 0)
 	h.run(h.a.insertTOC)
 	h.a.preview.ScrollToBlock(0)
