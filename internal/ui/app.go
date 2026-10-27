@@ -25,6 +25,7 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
+	"mdedit/internal/edit"
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/pdfout"
 )
@@ -116,6 +117,11 @@ func New(path string) (*App, error) {
 }
 
 func (a *App) load(path, content string) {
+	// Gio can't display tab characters; expand them as CommonMark would.
+	if strings.ContainsRune(content, '\t') {
+		content = edit.ExpandTabs(edit.New(content, 0, 0)).String()
+		a.setStatus("Tabs converted to spaces (the file changes only when you save)")
+	}
 	a.path = path
 	a.saved = content
 	a.editor.SetText(content)
@@ -416,6 +422,7 @@ func (a *App) layout(gtx layout.Context) {
 		}
 		// These keys must be handled before the editor sees them.
 		a.handleEnter(gtx)
+		a.handleTab(gtx)
 		a.handleMacKeys(gtx)
 		for _, c := range a.toolbarCmds {
 			if c != nil && c.click.Clicked(gtx) {
@@ -433,6 +440,9 @@ func (a *App) layout(gtx layout.Context) {
 			break
 		}
 		if _, ok := ev.(widget.ChangeEvent); ok {
+			if strings.ContainsRune(a.editor.Text(), '\t') {
+				a.applyEdit(gtx, edit.ExpandTabs) // pasted text
+			}
 			a.reparse()
 		}
 	}

@@ -108,3 +108,14 @@ func TestInsert(t *testing.T) {
 	check(t, "link from url", Link(st(t, "[https://go.dev]"), false), "[|](https://go.dev)")
 	check(t, "image", Link(st(t, "|"), true), "![[alt text]](image.png)")
 }
+
+func TestTabs(t *testing.T) {
+	check(t, "expand", ExpandTabs(st(t, "a\tb\n\tc|")), "a   b\n    c|")
+	check(t, "expand keeps selection", ExpandTabs(st(t, "\t[x]\ty")), "    [x]   y")
+	check(t, "tab inserts", Tab(st(t, "ab|")), "ab  |")
+	check(t, "tab at stop", Tab(st(t, "abcd|")), "abcd    |")
+	check(t, "tab nests item", Tab(st(t, "- a\n- b|")), "- a\n    - b|")
+	check(t, "tab indents lines", Tab(st(t, "[x\ny]")), "[    x\n    y]")
+	check(t, "outdent", Outdent(st(t, "- a\n    - b|")), "- a\n- b|")
+	check(t, "outdent partial", Outdent(st(t, "  x|")), "x|")
+}

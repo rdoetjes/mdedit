@@ -169,6 +169,13 @@ func TestScreenshot(t *testing.T) {
 	shot("align.png")
 	h.a.dialog = NewFileDialog("Open Markdown file", "../mdmodel/testdata", "", false, mdExts, func(string) {})
 	shot("dialog.png")
+	h.a.dialog = nil
+
+	h.setText("```bash\n# build and run\nfor f in *.md; do\n  mdedit -pdf \"$f\" -o \"${f%.md}.pdf\"\ndone\n```\n\n"+
+		"```C#\nusing System;\n\npublic class Hello {\n    // Entry point\n    public static void Main(string[] args) {\n        Console.WriteLine($\"Hello {args.Length}\");\n    }\n}\n```\n\n"+
+		"```go\nfunc fib(n int) int {\n\tif n < 2 {\n\t\treturn n // base case\n\t}\n\treturn fib(n-1) + fib(n-2)\n}\n```\n", 0, 0)
+	h.a.preview.ScrollToBlock(0)
+	shot("highlight.png")
 }
 
 
@@ -213,4 +220,21 @@ func TestMacNavigation(t *testing.T) {
 		t.Errorf("⌘→ in wrapped line went to %d, want a screen line end in (1000, %d)", end, len(long))
 	}
 	t.Logf("screen line: %d-%d", start, end)
+}
+
+func TestTabKey(t *testing.T) {
+	h := newHarness(t, "")
+	h.setText("- a\n- b", 7, 7)
+	h.press(key.NameTab, 0)
+	h.expect("- a\n    - b")
+	if !h.router.Source().Focused(&h.a.editor) {
+		t.Error("Tab moved focus out of the editor")
+	}
+	h.press(key.NameTab, key.ModShift)
+	h.expect("- a\n- b")
+	h.setText("x", 1, 1)
+	h.a.editor.Insert("\tpasted")
+	h.frame()
+	h.frame()
+	h.expect("x   pasted")
 }

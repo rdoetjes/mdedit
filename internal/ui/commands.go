@@ -244,6 +244,26 @@ func (a *App) handleEnter(gtx layout.Context) {
 	}
 }
 
+// handleTab indents with spaces instead of letting Tab move the keyboard
+// focus out of the editor.
+func (a *App) handleTab(gtx layout.Context) {
+	for {
+		ev, ok := gtx.Event(key.Filter{Focus: &a.editor, Name: key.NameTab, Optional: key.ModShift})
+		if !ok {
+			break
+		}
+		e, ok := ev.(key.Event)
+		if !ok || e.State != key.Press {
+			continue
+		}
+		if e.Modifiers.Contain(key.ModShift) {
+			a.applyEdit(gtx, edit.Outdent)
+		} else {
+			a.applyEdit(gtx, edit.Tab)
+		}
+	}
+}
+
 // handleMacKeys adds the standard macOS ⌘ navigation keys that Gio's editor
 // lacks: ⌘←/⌘→ to the start/end of the line, ⌘↑/⌘↓ to the start/end of the
 // document (with ⇧ to extend the selection), and ⌘⌫ to delete to the start

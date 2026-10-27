@@ -2,6 +2,7 @@ package mdmodel
 
 import (
 	"image/color"
+	"strings"
 	"sync"
 
 	"github.com/alecthomas/chroma/v2"
@@ -39,12 +40,33 @@ func Highlight(lang, code string) []Span {
 	return spans
 }
 
+// langAliases maps fence names chroma doesn't know to a lexer it does.
+var langAliases = map[string]string{
+	"f#":     "fsharp",
+	"x86asm": "nasm",
+	"pascal": "objectpascal",
+	"delphi": "objectpascal",
+	"plsql":  "sql",
+	"less":   "scss",
+}
+
+// normalizeLang turns a fence info word into a lexer name. It accepts
+// Pandoc-style "{.python}" and is case-insensitive for aliases.
+func normalizeLang(lang string) string {
+	lang = strings.Trim(lang, "{}")
+	lang = strings.TrimPrefix(lang, ".")
+	if a, ok := langAliases[strings.ToLower(lang)]; ok {
+		return a
+	}
+	return lang
+}
+
 func highlight(lang, code string) []Span {
 	plain := []Span{{Text: code, Mono: true}}
 	if lang == "" {
 		return plain
 	}
-	lexer := lexers.Get(lang)
+	lexer := lexers.Get(normalizeLang(lang))
 	if lexer == nil {
 		return plain
 	}

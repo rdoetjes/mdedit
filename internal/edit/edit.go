@@ -527,3 +527,79 @@ func Link(s State, image bool) State {
 	}
 	return s.replace(s.Start, s.End, txt, urlStart, urlStart+len([]rune(url)))
 }
+
+// ---- Tabs and indentation ----
+
+// TabWidth is the tab stop distance; CommonMark uses 4.
+const TabWidth = 4
+
+// ExpandTabs replaces tab characters with spaces up to the next tab stop,
+// which is how CommonMark interprets them. The selection follows the text.
+func ExpandTabs(s State) State {
+	var out []rune
+	start, end := s.Start, s.End
+	col := 0
+	for i, r := range s.Text {
+		if i == s.Start {
+			start = len(out)
+		}
+		if i == s.End {
+			end = len(out)
+		}
+		switch r {
+		case '\t':
+			n := TabWidth - col%TabWidth
+			for j := 0; j < n; j++ {
+				out = append(out, ' ')
+			}
+			col += n
+		case '\n':
+			out = append(out, r)
+			col = 0
+		default:
+			out = append(out, r)
+			col++
+		}
+	}
+	if s.Start == len(s.Text) {
+		start = len(out)
+	}
+	if s.End == len(s.Text) {
+		end = len(out)
+	}
+	return State{Text: out, Start: start, End: end}
+}
+
+// Tab handles the Tab key: on a list item or a selection spanning several
+// lines it indents the lines (nesting list items); otherwise it inserts
+// spaces up to the next tab stop.
+func Tab(s State) State {
+	from, to := s.selectedLines()
+	multi := strings.ContainsRune(string(s.Text[from:to]), '\n')
+	if multi || listRe.MatchString(string(s.Text[from:to])) {
+		return s.mapLines(func(_ int, l string) string {
+			if strings.TrimSpace(l) == "" {
+				return l
+			}
+			return strings.Repeat(" ", TabWidth) + l
+		})
+	}
+	if s.Start != s.End {
+		s = s.replace(s.Start, s.End, "", s.Start, s.Start)
+	}
+	col := s.Start - s.lineStart(s.Start)
+	n := TabWidth - col%TabWidth
+	return s.replace(s.Start, s.Start, strings.Repeat(" ", n), s.Start+n, s.Start+n)
+}
+
+// Outdent handles Shift+Tab: it removes up to one tab stop of leading spaces
+// from the selected lines.
+func Outdent(s State) State {
+	return s.mapLines(func(_ int, l string) string {
+		n := 0
+		for n < TabWidth && n < len(l) && l[n] == ' ' {
+			n++
+		}
+		return l[n:]
+	})
+}

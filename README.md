@@ -35,6 +35,15 @@ Pressing Enter in a list item or quote starts the next item (numbers count
 up); Enter on an empty item ends the list. Shift+Enter inserts a plain line
 break.
 
+Tab inserts spaces to the next 4-column stop; on list items (or several
+selected lines) Tab and Shift+Tab indent and outdent, nesting list items.
+Tab characters in opened or pasted text are converted to spaces, which is
+how CommonMark reads them anyway (Gio's text engine can't display tabs).
+
+Fenced code blocks are highlighted by the language after the fence
+(` ```go `, ` ```bash `, ` ```C# `, ` ```c++ `, ` ```yaml `, ` ```{.python} `
+…), covering about 250 languages and their usual aliases.
+
 On macOS the usual ⌘ navigation works in the editor: ⌘←/⌘→ to the start/end
 of the line, ⌘↑/⌘↓ to the start/end of the document (add ⇧ to select), and
 ⌘⌫ to delete to the start of the line. Home/End (fn+←/→) work everywhere.
