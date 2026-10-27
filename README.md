@@ -12,6 +12,7 @@ Wayland), FreeBSD, macOS and Windows.
   - [Building](#building)
   - [Usage](#usage)
     - [Maths](#maths)
+  - [Fenced blocks (code blocks)](#fenced-blocks-code-blocks)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
 
