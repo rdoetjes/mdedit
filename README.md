@@ -12,7 +12,7 @@ Wayland), FreeBSD, macOS and Windows.
   - [Building](#building)
   - [Usage](#usage)
     - [Maths](#maths)
-  - [Fenced blocks (code blocks)](#fenced-blocks-code-blocks)
+    - [Fenced blocks (code blocks)](#fenced-blocks-code-blocks)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
 
@@ -92,7 +92,7 @@ $$
 \sqrt{e}\, \sqrt{T}\,\sqrt{T^2_1}
 $$
 
-## Fenced blocks (code blocks)
+### Fenced blocks (code blocks)
 
 Fenced code blocks are highlighted by the language after the fence
 (` ```go `, ` ```bash `, ` ```C# `, ` ```c++ `, ` ```yaml `, ` ```{.python} `
