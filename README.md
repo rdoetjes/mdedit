@@ -40,6 +40,12 @@ selected lines) Tab and Shift+Tab indent and outdent, nesting list items.
 Tab characters in opened or pasted text are converted to spaces, which is
 how CommonMark reads them anyway (Gio's text engine can't display tabs).
 
+Insert → Table of Contents adds a nested list of links to all headings,
+between `<!-- toc -->` and `<!-- /toc -->` markers (hidden when rendered,
+and the convention markdown-toc and VS Code use). Right-click in the editor
+or preview and choose Update Table of Contents to regenerate it after
+editing headings; the right-click menu also has Cut, Copy and Paste.
+
 Fenced code blocks are highlighted by the language after the fence
 (` ```go `, ` ```bash `, ` ```C# `, ` ```c++ `, ` ```yaml `, ` ```{.python} `
 …), covering about 250 languages and their usual aliases.

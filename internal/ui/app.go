@@ -14,6 +14,7 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/gesture"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -72,6 +73,18 @@ type App struct {
 	bar         menuBar
 	hint        string // status bar text while hovering a toolbar button
 	regions     []widget.Region
+
+	// Context menu.
+	cutCmd, copyCmd, pasteCmd *command
+	insertTOC, updateTOC      *command
+	ctxTag                    int
+	ctxOpen                   bool
+	ctxAt                     image.Point
+	ctxPopup                  popup
+	bodyTop                   int // window y of the editor/preview area
+	// keepSel holds the editor selection across a right-click, which the
+	// editor would otherwise treat as a click that moves the caret.
+	keepSel *[2]int
 
 	dialog dialog
 	// pending runs on the next frame; used for edits requested from dialogs.
@@ -448,19 +461,56 @@ func (a *App) layout(gtx layout.Context) {
 	}
 	a.updateTitle()
 
+	// Right-click in the editor or preview opens the context menu.
+	for {
+		ev, ok := gtx.Event(pointer.Filter{Target: &a.ctxTag, Kinds: pointer.Press})
+		if !ok {
+			break
+		}
+		if e, ok := ev.(pointer.Event); ok && e.Buttons.Contain(pointer.ButtonSecondary) && a.dialog == nil {
+			a.ctxOpen = true
+			a.ctxAt = image.Pt(int(e.Position.X), int(e.Position.Y)+a.bodyTop)
+			a.bar.open = -1
+			s, e := a.editor.Selection()
+			a.keepSel = &[2]int{s, e}
+		}
+	}
+
 	size := gtx.Constraints.Max
+	var barH, toolH int
 	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return a.bar.Layout(gtx, a.th, a.menus, a.dialog == nil)
+			d := a.bar.Layout(gtx, a.th, a.menus, a.dialog == nil)
+			barH = d.Size.Y
+			return d
 		}),
-		layout.Rigid(a.toolbar),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			d := a.toolbar(gtx)
+			toolH = d.Size.Y
+			return d
+		}),
 		layout.Flexed(1, a.body),
 		layout.Rigid(a.statusBar),
 	)
+	a.bodyTop = barH + toolH
+	if a.keepSel != nil {
+		a.editor.SetCaret(a.keepSel[0], a.keepSel[1])
+		a.keepSel = nil
+	}
 	gtx.Constraints = layout.Exact(size)
-	if a.dialog != nil {
+	switch {
+	case a.dialog != nil:
+		a.ctxOpen = false
 		a.dialog.Layout(gtx, a.th)
-	} else {
+	case a.ctxOpen:
+		chosen, closed := a.ctxPopup.Layout(gtx, a.th, a.contextItems(), a.ctxAt, image.Rectangle{})
+		if closed {
+			a.ctxOpen = false
+		}
+		if chosen != nil {
+			chosen.run(gtx)
+		}
+	default:
 		a.bar.Overlay(gtx, a.th, a.menus)
 	}
 }
@@ -558,6 +608,18 @@ func (a *App) statusBar(gtx layout.Context) layout.Dimensions {
 }
 
 func (a *App) body(gtx layout.Context) layout.Dimensions {
+	dims := a.panes(gtx)
+	// Watch for right-clicks over both panes, letting the events through to
+	// the editor and preview as well.
+	area := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
+	pass := pointer.PassOp{}.Push(gtx.Ops)
+	event.Op(gtx.Ops, &a.ctxTag)
+	pass.Pop()
+	area.Pop()
+	return dims
+}
+
+func (a *App) panes(gtx layout.Context) layout.Dimensions {
 	size := gtx.Constraints.Max
 	switch a.view {
 	case viewEditor:

@@ -3,6 +3,8 @@ package edit
 import (
 	"strings"
 	"testing"
+
+	"mdedit/internal/mdmodel"
 )
 
 // st builds a State from text where "|" marks the caret, or "[" and "]"
@@ -130,4 +132,42 @@ func TestEmptyLines(t *testing.T) {
 	check(t, "number on empty line", ToggleList(st(t, "|"), Numbers), "1. |")
 	check(t, "task on empty line", ToggleList(st(t, "|"), Tasks), "- [ ] |")
 	check(t, "quote on empty line", ToggleQuote(st(t, "|")), "> |")
+}
+
+func TestTOC(t *testing.T) {
+	doc := "# Title\n\n## Intro *text*\n\n### Detail\n\n## Intro text\n\n#### Deep\n\n> ## Quoted\n"
+	want := "- [Title](#title)\n" +
+		"  - [Intro text](#intro-text)\n" +
+		"    - [Detail](#detail)\n" +
+		"  - [Intro text](#intro-text-1)\n" +
+		"    - [Deep](#deep)"
+	if got := BuildTOC(doc); got != want {
+		t.Errorf("BuildTOC:\n%s\nwant:\n%s", got, want)
+	}
+	// Skipped levels at the start don't create code blocks.
+	if got := BuildTOC("### a\n\n# b\n"); got != "- [a](#a)\n- [b](#b)" {
+		t.Errorf("skipped levels: %q", got)
+	}
+
+	s := InsertTOC(st(t, "|\n\n# A\n\n## B\n"))
+	check(t, "insert", s, "<!-- toc -->\n\n- [A](#a)\n  - [B](#b)\n\n<!-- /toc -->|\n\n# A\n\n## B\n")
+
+	// Update after adding a heading; the caret after the TOC moves with it.
+	upd := UpdateTOC(st(t, "<!-- toc -->\n\n- [A](#a)\n\n<!-- /toc -->\n\n# A\n\n# C|\n"))
+	check(t, "update", upd, "<!-- toc -->\n\n- [A](#a)\n- [C](#c)\n\n<!-- /toc -->\n\n# A\n\n# C|\n")
+
+	// Inserting when one exists updates it instead of adding a second.
+	again := InsertTOC(st(t, "<!-- toc -->\n<!-- /toc -->\n\n# X|"))
+	if strings.Count(again.String(), TOCStart) != 1 || !strings.Contains(again.String(), "[X](#x)") {
+		t.Errorf("second insert: %q", again.String())
+	}
+
+	// The TOC renders as a list of links with the markers hidden.
+	d := mdmodel.Parse([]byte(s.String()))
+	if len(d.Blocks) == 0 || d.Blocks[0].Kind != mdmodel.Paragraph || d.Blocks[0].Spans[0].Link != "#a" {
+		t.Errorf("rendered TOC: %+v", d.Blocks[0])
+	}
+	if d.HeadingIndex("b") < 0 {
+		t.Error("anchor #b missing")
+	}
 }

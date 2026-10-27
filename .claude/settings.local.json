@@ -53,7 +53,8 @@
       "Bash(osascript -l JavaScript /tmp/mdtools/pdfpages.js /tmp/mdout/align.pdf /tmp/mdout)",
       "Bash(sips -c 400 1000 /tmp/mdout/p1.png --out /tmp/mdout/p1crop.png)",
       "Bash(make test *)",
-      "Bash(GOTOOLCHAIN=local go test ./internal/edit)"
+      "Bash(GOTOOLCHAIN=local go test ./internal/edit)",
+      "Bash(./bin/mdedit -pdf /tmp/mdout/toc.md)"
     ]
   }
 }

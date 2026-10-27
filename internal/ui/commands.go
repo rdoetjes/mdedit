@@ -124,6 +124,22 @@ func (a *App) buildCommands() {
 	// Toolbar groups; nil separates them.
 	a.toolbarCmds = []*command{bold, italic, underline, nil, left, center, right, nil, numbered, bullets, table}
 
+	a.insertTOC = format("Table of Contents", "", 0, edit.InsertTOC)
+	a.updateTOC = sc("Update Table of Contents", "", 0, func(gtx layout.Context) {
+		if _, _, ok := edit.FindTOC(edit.New(a.editor.Text(), 0, 0)); !ok {
+			a.setStatus("This document has no table of contents; use Insert → Table of Contents")
+			return
+		}
+		a.applyEdit(gtx, edit.UpdateTOC)
+		a.setStatus("Table of contents updated")
+	})
+	a.cutCmd = &command{label: "Cut", key: "X", native: true, run: a.cut}
+	a.copyCmd = &command{label: "Copy", key: "C", native: true, run: a.copy}
+	a.pasteCmd = &command{label: "Paste", key: "V", native: true, run: func(gtx layout.Context) {
+		gtx.Execute(clipboard.ReadCmd{Tag: &a.editor})
+		gtx.Execute(key.FocusCmd{Tag: &a.editor})
+	}}
+
 	view := func(label string, v viewMode) *command {
 		return plain(label, func() { a.view = v })
 	}
@@ -141,12 +157,7 @@ func (a *App) buildCommands() {
 			sc("Quit", "Q", 0, func(layout.Context) { a.quit() }),
 		}},
 		{"Edit", []*command{
-			{label: "Cut", key: "X", native: true, run: a.cut},
-			{label: "Copy", key: "C", native: true, run: a.copy},
-			{label: "Paste", key: "V", native: true, run: func(gtx layout.Context) {
-				gtx.Execute(clipboard.ReadCmd{Tag: &a.editor})
-				gtx.Execute(key.FocusCmd{Tag: &a.editor})
-			}},
+			a.cutCmd, a.copyCmd, a.pasteCmd,
 			nil,
 			{label: "Select All", key: "A", native: true, run: func(gtx layout.Context) {
 				a.editor.SetCaret(a.editor.Len(), 0)
@@ -177,6 +188,8 @@ func (a *App) buildCommands() {
 			format("Code Block", "K", shift, edit.CodeBlock),
 			format("Horizontal Rule", "", 0, edit.Rule),
 			nil,
+			a.insertTOC, a.updateTOC,
+			nil,
 			format("Link", "K", 0, func(s edit.State) edit.State { return edit.Link(s, false) }),
 			format("Image", "I", shift, func(s edit.State) edit.State { return edit.Link(s, true) }),
 		}},
@@ -192,6 +205,16 @@ func (a *App) buildCommands() {
 			plain("About mdedit", a.about),
 		}},
 	}
+}
+
+// contextItems returns the right-click menu: clipboard commands, then
+// insert or update the table of contents.
+func (a *App) contextItems() []*command {
+	toc := a.insertTOC
+	if _, _, ok := edit.FindTOC(edit.New(a.editor.Text(), 0, 0)); ok {
+		toc = a.updateTOC
+	}
+	return []*command{a.cutCmd, a.copyCmd, a.pasteCmd, nil, toc}
 }
 
 // handleShortcuts runs commands whose keyboard shortcut was pressed.

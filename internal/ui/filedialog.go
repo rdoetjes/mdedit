@@ -188,22 +188,26 @@ func (d *FileDialog) Layout(gtx layout.Context, th *material.Theme) layout.Dimen
 	if d.hidden.Update(gtx) {
 		d.chdir(d.dir)
 	}
+	// Find the clicked entry first and act on it after the loop: entering a
+	// folder replaces d.entries and d.clicks, which must not happen while
+	// iterating over them.
+	clicked, numClicks := -1, 0
 	for i := range d.clicks {
 		for {
 			c, ok := d.clicks[i].Update(gtx)
 			if !ok {
 				break
 			}
-			if i >= len(d.entries) {
-				break
-			}
-			e := d.entries[i]
-			if isDir(d.dir, e) {
-				d.chdir(filepath.Join(d.dir, e.Name()))
-				break
-			}
+			clicked, numClicks = i, c.NumClicks
+		}
+	}
+	if clicked >= 0 && clicked < len(d.entries) {
+		e := d.entries[clicked]
+		if isDir(d.dir, e) {
+			d.chdir(filepath.Join(d.dir, e.Name()))
+		} else {
 			d.name.SetText(e.Name())
-			if c.NumClicks >= 2 {
+			if numClicks >= 2 {
 				d.accept()
 			}
 		}

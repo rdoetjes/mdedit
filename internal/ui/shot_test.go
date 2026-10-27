@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -9,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/gpu/headless"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -184,6 +187,13 @@ func TestScreenshot(t *testing.T) {
 		"```go\nfunc fib(n int) int {\n\tif n < 2 {\n\t\treturn n // base case\n\t}\n\treturn fib(n-1) + fib(n-2)\n}\n```\n", 0, 0)
 	h.a.preview.ScrollToBlock(0)
 	shot("highlight.png")
+
+	h.setText("# Guide\n\n## Install\n\n### Linux\n\n### FreeBSD\n\n## Usage\n\n### Shortcuts\n\n## Licence\n", 0, 0)
+	h.run(h.a.insertTOC)
+	h.a.preview.ScrollToBlock(0)
+	h.rightClick(700, 700)
+	shot("toc.png")
+	h.a.ctxOpen = false
 }
 
 
@@ -245,4 +255,104 @@ func TestTabKey(t *testing.T) {
 	h.frame()
 	h.frame()
 	h.expect("x   pasted")
+}
+
+func (h *harness) rightClick(x, y float32) {
+	h.router.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Buttons: pointer.ButtonSecondary, Position: f32.Pt(x, y)},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(x, y)},
+	)
+	h.frame()
+	h.frame()
+}
+
+func (h *harness) run(c *command) {
+	h.a.ctxOpen = false
+	h.a.pending = func(gtx layout.Context) { c.run(gtx) }
+	h.frame()
+	h.frame()
+}
+
+func TestTOCContextMenu(t *testing.T) {
+	h := newHarness(t, "")
+	h.setText("# A\n\n## B\n", 0, 0)
+
+	// Right-clicking keeps the selection, so Cut/Copy apply to it.
+	h.a.editor.SetCaret(4, 0)
+	h.rightClick(600, 700) // in the editor pane, away from the selection
+	if s, e := h.a.editor.Selection(); s != 4 || e != 0 {
+		t.Errorf("right-click changed the selection to %d-%d", s, e)
+	}
+	h.a.editor.SetCaret(0, 0)
+	h.rightClick(600, 700)
+	if !h.a.ctxOpen {
+		t.Fatal("right-click did not open the context menu")
+	}
+	items := h.a.contextItems()
+	if items[len(items)-1] != h.a.insertTOC {
+		t.Fatalf("expected Insert Table of Contents, got %q", items[len(items)-1].label)
+	}
+	h.run(h.a.insertTOC)
+	// Inserted on its own lines below the line holding the caret: the title.
+	h.expect("# A\n\n<!-- toc -->\n\n- [A](#a)\n  - [B](#b)\n\n<!-- /toc -->\n\n## B\n")
+
+	// Add a heading, then update from the context menu (in the preview pane).
+	h.setText(h.a.editor.Text()+"\n## C\n", 0, 0)
+	h.rightClick(1800, 500)
+	items = h.a.contextItems()
+	if !h.a.ctxOpen || items[len(items)-1] != h.a.updateTOC {
+		t.Fatal("expected Update Table of Contents in the context menu")
+	}
+	h.run(h.a.updateTOC)
+	h.expect("# A\n\n<!-- toc -->\n\n- [A](#a)\n  - [B](#b)\n  - [C](#c)\n\n<!-- /toc -->\n\n## B\n\n## C\n")
+
+	// The TOC links resolve to headings in the preview.
+	for _, id := range []string{"a", "b", "c"} {
+		if h.a.doc.HeadingIndex(id) < 0 {
+			t.Errorf("anchor #%s not found", id)
+		}
+	}
+}
+
+// Regression: clicking a folder that has fewer entries than the current one
+// crashed, because the click loop kept indexing the old entry count.
+func TestFileDialogEnterSmallerFolder(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 20; i++ {
+		if err := os.Mkdir(filepath.Join(root, fmt.Sprintf("d%02d", i)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	small := filepath.Join(root, "d00")
+	if err := os.WriteFile(filepath.Join(small, "note.md"), []byte("# hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h := newHarness(t, "")
+	var picked string
+	d := NewFileDialog("Open", root, "", false, mdExts, func(p string) { picked = p; h.a.dialog = nil })
+	h.a.dialog = d
+	h.frame()
+
+	d.clicks[0].Click() // enter d00, which has a single entry
+	h.frame()
+	h.frame()
+	if d.dir != small {
+		t.Fatalf("dialog in %s, want %s", d.dir, small)
+	}
+	if len(d.entries) != 1 || d.entries[0].Name() != "note.md" {
+		t.Fatalf("entries: %v", d.entries)
+	}
+
+	// Up again, then into the folder once more, then open the file.
+	d.up.Click()
+	h.frame()
+	d.clicks[0].Click()
+	h.frame()
+	d.name.SetText("note.md")
+	d.ok.Click()
+	h.frame()
+	if picked != filepath.Join(small, "note.md") {
+		t.Errorf("picked %q", picked)
+	}
 }

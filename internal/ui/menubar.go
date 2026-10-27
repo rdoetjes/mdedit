@@ -20,8 +20,7 @@ type menuBar struct {
 	open    int // index of the open menu, or -1
 	titles  []widget.Clickable
 	titleX  []int // left edge of each title, recorded during layout
-	items   [][]widget.Clickable
-	dismiss gesture.Click
+	popup   popup
 	barH    int
 }
 
@@ -34,10 +33,6 @@ func (m *menuBar) ensure(menus []*menu) {
 	if len(m.titles) != len(menus) {
 		m.titles = make([]widget.Clickable, len(menus))
 		m.titleX = make([]int, len(menus))
-		m.items = make([][]widget.Clickable, len(menus))
-		for i, mn := range menus {
-			m.items[i] = make([]widget.Clickable, len(mn.items))
-		}
 		m.open = -1
 	}
 }
@@ -114,50 +109,66 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 	if m.open < 0 || m.open >= len(menus) {
 		return
 	}
-	mn := menus[m.open]
-	items := m.items[m.open]
+	// Leave the bar uncovered so its titles stay clickable.
+	bar := image.Rect(0, 0, gtx.Constraints.Max.X, m.barH)
+	chosen, closed := m.popup.Layout(gtx, th, menus[m.open].items, image.Pt(m.titleX[m.open], m.barH), bar)
+	if closed {
+		m.open = -1
+	}
+	if chosen != nil {
+		chosen.run(gtx)
+	}
+}
 
+// popup is a drop-down list of commands, used for menus and the context menu.
+type popup struct {
+	clicks  []widget.Clickable
+	dismiss gesture.Click
+}
+
+// Layout draws items with the top-left corner at `at`, moved if needed to
+// stay inside the window. A click outside the popup (except in keepClear)
+// or Escape closes it. It returns the chosen command, if any, and whether
+// the popup closed.
+func (p *popup) Layout(gtx layout.Context, th *material.Theme, items []*command, at image.Point, keepClear image.Rectangle) (*command, bool) {
+	if len(p.clicks) < len(items) {
+		p.clicks = make([]widget.Clickable, len(items))
+	}
 	for {
 		ev, ok := gtx.Event(key.Filter{Name: key.NameEscape})
 		if !ok {
 			break
 		}
 		if e, ok := ev.(key.Event); ok && e.State == key.Press {
-			m.open = -1
-			return
+			return nil, true
 		}
 	}
-	for i, c := range mn.items {
-		if c != nil && items[i].Clicked(gtx) {
-			m.open = -1
-			c.run(gtx)
-			return
+	for i, c := range items {
+		if c != nil && p.clicks[i].Clicked(gtx) {
+			return c, true
 		}
 	}
-	// A click anywhere outside the menu closes it.
 	for {
-		ev, ok := m.dismiss.Update(gtx.Source)
+		ev, ok := p.dismiss.Update(gtx.Source)
 		if !ok {
 			break
 		}
 		if ev.Kind == gesture.KindPress {
-			m.open = -1
-			return
+			return nil, true
 		}
 	}
-	// The dismiss area leaves the bar uncovered, so titles stay clickable.
-	full := clip.Rect{Min: image.Pt(0, m.barH), Max: gtx.Constraints.Max}.Push(gtx.Ops)
-	m.dismiss.Add(gtx.Ops)
+	win := gtx.Constraints.Max
+	// The dismiss area covers the window below keepClear (the menu bar).
+	full := clip.Rect{Min: image.Pt(0, keepClear.Max.Y), Max: win}.Push(gtx.Ops)
+	p.dismiss.Add(gtx.Ops)
 	full.Pop()
 
-	st := op.Offset(image.Pt(m.titleX[m.open], m.barH)).Push(gtx.Ops)
-	defer st.Pop()
 	gtx.Constraints.Min = image.Point{}
 
 	// Width: wide enough for the longest label plus its shortcut.
 	rec := op.Record(gtx.Ops)
 	menuW := gtx.Dp(220)
-	for _, c := range mn.items {
+	for _, c := range items {
 		if c == nil {
 			continue
 		}
@@ -168,7 +179,7 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 
 	macro := op.Record(gtx.Ops)
 	var children []layout.FlexChild
-	for i, c := range mn.items {
+	for i, c := range items {
 		if c == nil {
 			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				h := gtx.Dp(9)
@@ -177,14 +188,15 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 			}))
 			continue
 		}
+		click := &p.clicks[i]
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return items[i].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return click.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				gtx.Constraints.Min.X = menuW
 				gtx.Constraints.Max.X = menuW
 				return layout.Background{}.Layout(gtx,
 					func(gtx layout.Context) layout.Dimensions {
 						sz := gtx.Constraints.Min
-						if items[i].Hovered() {
+						if click.Hovered() {
 							paint.FillShape(gtx.Ops, menuHover, clip.Rect{Max: sz}.Op())
 						}
 						return layout.Dimensions{Size: sz}
@@ -213,6 +225,12 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 	})
 	call := macro.Stop()
 
+	// Keep the popup inside the window.
+	at.X = max(0, min(at.X, win.X-dims.Size.X))
+	at.Y = max(0, min(at.Y, win.Y-dims.Size.Y))
+	st := op.Offset(at).Push(gtx.Ops)
+	defer st.Pop()
+
 	// Shadow, card, border, then the items.
 	r := gtx.Dp(6)
 	box := image.Rectangle{Max: dims.Size}
@@ -223,6 +241,7 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 	blockPointer(gtx)
 	area.Pop()
 	call.Add(gtx.Ops)
+	return nil, false
 }
 
 func measureLabel(gtx layout.Context, th *material.Theme, s string) int {
