@@ -119,3 +119,15 @@ func TestTabs(t *testing.T) {
 	check(t, "outdent", Outdent(st(t, "- a\n    - b|")), "- a\n- b|")
 	check(t, "outdent partial", Outdent(st(t, "  x|")), "x|")
 }
+
+func TestEmptyLines(t *testing.T) {
+	check(t, "h1 on empty line", SetHeading(st(t, "|"), 1), "# |")
+	check(t, "h3 on empty line", SetHeading(st(t, "a\n|\nb"), 3), "a\n### |\nb")
+	check(t, "h2 to h4 before typing", SetHeading(st(t, "## |"), 4), "#### |")
+	check(t, "h2 toggles off before typing", SetHeading(st(t, "## |"), 2), "|")
+	check(t, "blank lines in selection untouched", SetHeading(st(t, "[a\n\nb]"), 2), "[## a\n\n## b]")
+	check(t, "bullet on empty line", ToggleList(st(t, "|"), Bullets), "- |")
+	check(t, "number on empty line", ToggleList(st(t, "|"), Numbers), "1. |")
+	check(t, "task on empty line", ToggleList(st(t, "|"), Tasks), "- [ ] |")
+	check(t, "quote on empty line", ToggleQuote(st(t, "|")), "> |")
+}

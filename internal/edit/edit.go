@@ -253,8 +253,8 @@ func ToggleQuote(s State) State {
 		if all {
 			return quoteRe.ReplaceAllString(l, "$1")
 		}
-		if l == "" {
-			return ">"
+		if l == "" && strings.ContainsRune(string(s.Text[from:to]), '\n') {
+			return ">" // blank line inside a quoted selection
 		}
 		return "> " + l
 	})
@@ -268,9 +268,12 @@ func SetHeading(s State, level int) State {
 	if m := headRe.FindString(first); level > 0 && strings.TrimSpace(m) == strings.Repeat("#", level) {
 		level = 0
 	}
+	single := !strings.ContainsRune(string(s.Text[from:to]), '\n')
 	return s.mapLines(func(_ int, l string) string {
 		l = headRe.ReplaceAllString(l, "")
-		if level == 0 || strings.TrimSpace(l) == "" {
+		// Blank lines inside a multi-line selection stay blank, but a single
+		// empty line gets the marker so the heading can be typed after it.
+		if level == 0 || (strings.TrimSpace(l) == "" && !single) {
 			return l
 		}
 		return strings.Repeat("#", level) + " " + l

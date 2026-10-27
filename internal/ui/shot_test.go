@@ -103,6 +103,14 @@ func TestShortcuts(t *testing.T) {
 	h.expect("word")
 	h.press("1", key.ModShortcut)
 	h.expect("# word")
+
+	// On an empty line the marker is inserted, ready for typing.
+	h.setText("", 0, 0)
+	h.press("2", key.ModShortcut)
+	h.expect("## ")
+	if c, _ := h.a.editor.Selection(); c != 3 {
+		t.Errorf("caret at %d after heading marker, want 3", c)
+	}
 }
 
 func TestTableDialog(t *testing.T) {
