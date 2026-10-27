@@ -147,3 +147,13 @@ func Outline(faceID uint8, g uint16) []Seg {
 	paths[k] = out
 	return out
 }
+
+// Fallback returns a glyph for r from the maths font, for text whose own
+// font lacks it, with its advance in em.
+func Fallback(r rune) (faceID uint8, g uint16, adv float32, ok bool) {
+	faceID, g, ok = lookup(r)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	return faceID, g, glyphInfo(faceID, g).adv, true
+}

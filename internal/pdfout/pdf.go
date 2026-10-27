@@ -2,6 +2,7 @@
 package pdfout
 
 import (
+	"image/color"
 	"io"
 	"path/filepath"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/image/font/gofont/gomonobolditalic"
 	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/sfnt"
 
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
@@ -59,12 +61,13 @@ func Write(w io.Writer, doc *mdmodel.Document, opt Options) error {
 	pw, ph := pdf.GetPageSize()
 	m := float64(opt.Margin)
 	e := &exporter{
-		pdf:    pdf,
-		left:   float32(m),
-		top:    float32(m),
-		bottom: float32(ph - m),
-		links:  map[string]int{},
-		base:   opt.BaseDir,
+		pdf:      pdf,
+		left:     float32(m),
+		top:      float32(m),
+		bottom:   float32(ph - m),
+		links:    map[string]int{},
+		coverage: map[coverKey]bool{},
+		base:     opt.BaseDir,
 	}
 	ctx := &render.Ctx{
 		Em:             opt.FontSize,
@@ -141,6 +144,7 @@ type exporter struct {
 	left, top, bottom float32
 	y                 float32
 	links             map[string]int
+	coverage          map[coverKey]bool
 	base              string
 }
 
@@ -198,9 +202,7 @@ func (e *exporter) draw(l *render.Layout, y0, y1, dy float32) {
 			if txt == "" {
 				continue
 			}
-			e.setFont(p.Font, p.Size)
-			pdf.SetTextColor(int(p.Color.R), int(p.Color.G), int(p.Color.B))
-			pdf.Text(float64(e.left+p.X), float64(p.Y+dy), txt)
+			e.drawText(p.Font, p.Size, txt, e.left+p.X, p.Y+dy, p.Color)
 		case render.PRect, render.PEllipse:
 			top, bot := max(p.Y, y0), min(p.Y+p.H, y1)
 			if bot <= top {
@@ -242,37 +244,7 @@ func (e *exporter) draw(l *render.Layout, y0, y1, dy float32) {
 			if p.Y <= y0 || p.Y > y1 {
 				continue
 			}
-			segs := tex.Outline(p.Face, p.Glyph)
-			if len(segs) == 0 {
-				continue
-			}
-			sx, sy := p.Size*p.XScale, p.Size*p.YScale
-			pt := func(q [2]float32) (float64, float64) {
-				return float64(e.left + p.X + q[0]*sx), float64(p.Y + dy + q[1]*sy)
-			}
-			pdf.SetFillColor(int(p.Color.R), int(p.Color.G), int(p.Color.B))
-			for i, s := range segs {
-				switch s.Op {
-				case tex.MoveTo:
-					if i > 0 {
-						pdf.ClosePath()
-					}
-					pdf.MoveTo(pt(s.P[0]))
-				case tex.LineTo:
-					pdf.LineTo(pt(s.P[0]))
-				case tex.QuadTo:
-					cx, cy := pt(s.P[0])
-					x, y := pt(s.P[1])
-					pdf.CurveTo(cx, cy, x, y)
-				case tex.CubeTo:
-					c1x, c1y := pt(s.P[0])
-					c2x, c2y := pt(s.P[1])
-					x, y := pt(s.P[2])
-					pdf.CurveBezierCubicTo(c1x, c1y, c2x, c2y, x, y)
-				}
-			}
-			pdf.ClosePath()
-			pdf.DrawPath("F")
+			e.fillGlyph(p.Face, p.Glyph, e.left+p.X, p.Y+dy, p.Size*p.XScale, p.Size*p.YScale, p.Color)
 		case render.PPoly:
 			cy := (p.Top() + p.Points[len(p.Points)/2][1]) / 2
 			if cy <= y0 || cy > y1 {
@@ -332,11 +304,154 @@ func (e *exporter) setFont(f render.FontSpec, size float32) {
 
 func (e *exporter) measure(f render.FontSpec, size float32, s string) render.Metrics {
 	e.setFont(f, size)
-	return render.Metrics{
-		Width:   float32(e.pdf.GetStringWidth(s)),
-		Ascent:  ascent * size,
-		Descent: descent * size,
+	var w float32
+	for _, pc := range e.pieces(f, s) {
+		if pc.fallback {
+			for _, r := range pc.text {
+				w += e.fallbackAdvance(r, size)
+			}
+		} else {
+			w += float32(e.pdf.GetStringWidth(pc.text))
+		}
 	}
+	return render.Metrics{Width: w, Ascent: ascent * size, Descent: descent * size}
+}
+
+// Characters the Go fonts lack (⌘, ⇧, ✓ …) are drawn as outlines from the
+// maths font instead of as empty boxes.
+
+type piece struct {
+	text     string
+	fallback bool
+}
+
+// pieces splits s into runs the Go font can set and runs that need the
+// fallback font.
+func (e *exporter) pieces(f render.FontSpec, s string) []piece {
+	var out []piece
+	for _, r := range s {
+		fb := !e.covered(f, r)
+		if fb {
+			if _, _, _, ok := tex.Fallback(r); !ok {
+				fb = false // nothing better: let the PDF font show its box
+			}
+		}
+		if n := len(out); n > 0 && out[n-1].fallback == fb {
+			out[n-1].text += string(r)
+		} else {
+			out = append(out, piece{string(r), fb})
+		}
+	}
+	return out
+}
+
+func (e *exporter) covered(f render.FontSpec, r rune) bool {
+	if r < 0x80 {
+		return true
+	}
+	k := coverKey{f, r}
+	if v, ok := e.coverage[k]; ok {
+		return v
+	}
+	font := goFonts[fontIndex(f)]
+	var buf sfnt.Buffer
+	g, err := font.GlyphIndex(&buf, r)
+	v := err == nil && g != 0
+	e.coverage[k] = v
+	return v
+}
+
+func (e *exporter) fallbackAdvance(r rune, size float32) float32 {
+	_, _, adv, _ := tex.Fallback(r)
+	return adv * size
+}
+
+// drawText sets s with its baseline at (x, y), switching to the fallback
+// font where needed.
+func (e *exporter) drawText(f render.FontSpec, size float32, s string, x, y float32, col color.NRGBA) {
+	e.setFont(f, size)
+	e.pdf.SetTextColor(int(col.R), int(col.G), int(col.B))
+	for _, pc := range e.pieces(f, s) {
+		if !pc.fallback {
+			e.pdf.Text(float64(x), float64(y), pc.text)
+			x += float32(e.pdf.GetStringWidth(pc.text))
+			continue
+		}
+		for _, r := range pc.text {
+			face, g, adv, _ := tex.Fallback(r)
+			e.fillGlyph(face, g, x, y, size, size, col)
+			x += adv * size
+		}
+	}
+}
+
+// fillGlyph fills a glyph outline with its origin at (x, y) in page
+// coordinates, scaled by sx and sy.
+func (e *exporter) fillGlyph(face uint8, g uint16, x, y, sx, sy float32, col color.NRGBA) {
+	segs := tex.Outline(face, g)
+	if len(segs) == 0 {
+		return
+	}
+	pdf := e.pdf
+	pt := func(q [2]float32) (float64, float64) {
+		return float64(x + q[0]*sx), float64(y + q[1]*sy)
+	}
+	pdf.SetFillColor(int(col.R), int(col.G), int(col.B))
+	for i, s := range segs {
+		switch s.Op {
+		case tex.MoveTo:
+			if i > 0 {
+				pdf.ClosePath()
+			}
+			pdf.MoveTo(pt(s.P[0]))
+		case tex.LineTo:
+			pdf.LineTo(pt(s.P[0]))
+		case tex.QuadTo:
+			cx, cy := pt(s.P[0])
+			px, py := pt(s.P[1])
+			pdf.CurveTo(cx, cy, px, py)
+		case tex.CubeTo:
+			c1x, c1y := pt(s.P[0])
+			c2x, c2y := pt(s.P[1])
+			px, py := pt(s.P[2])
+			pdf.CurveBezierCubicTo(c1x, c1y, c2x, c2y, px, py)
+		}
+	}
+	pdf.ClosePath()
+	pdf.DrawPath("F")
+}
+
+type coverKey struct {
+	f render.FontSpec
+	r rune
+}
+
+// goFonts are the parsed Go fonts, in the order of fontIndex.
+var goFonts = func() []*sfnt.Font {
+	var out []*sfnt.Font
+	for _, ttf := range [][]byte{goregular.TTF, gobold.TTF, goitalic.TTF, gobolditalic.TTF,
+		gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF} {
+		f, err := sfnt.Parse(ttf)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, f)
+	}
+	return out
+}()
+
+func fontIndex(f render.FontSpec) int {
+	i := 0
+	if f.Bold {
+		i++
+	}
+	if f.Italic {
+		i += 2
+	}
+	if f.Mono {
+		i += 4
+	}
+	return i
 }
 
 func registerFonts(pdf *fpdf.Fpdf) {
