@@ -119,6 +119,14 @@ func (c *Ctx) layoutInline(items []inlineItem, maxW, strut, lineHeight float32, 
 		cur.height = h
 		cur.baseline = y + (h-(asc+desc))/2 + asc
 		cur.width = x
+		// Trailing spaces don't count for alignment.
+		if n := len(cur.runs); n > 0 && !preserve {
+			r := cur.runs[n-1]
+			if tr := strings.TrimRightFunc(r.text, unicode.IsSpace); tr != r.text {
+				it := items[r.item]
+				cur.width -= c.Measure(it.font, it.size, r.text[len(tr):]).Width
+			}
+		}
 		lines = append(lines, cur)
 		y += h
 		cur = line{}
@@ -223,6 +231,10 @@ func (c *Ctx) emitLines(l *Layout, items []inlineItem, lines []line, ox, oy, w f
 			}
 			l.Prims = append(l.Prims, Prim{Kind: PText, X: x, Y: base, W: r.w, Text: r.text,
 				Font: it.font, Size: it.size, Color: it.color})
+			if it.span.Underline {
+				l.Prims = append(l.Prims, Prim{Kind: PRect, X: x, Y: base + 0.12*it.size, W: r.w,
+					H: max(1, it.size/16), Color: it.color})
+			}
 			if it.span.Strike {
 				l.Prims = append(l.Prims, Prim{Kind: PRect, X: x, Y: base - 0.3*it.size, W: r.w,
 					H: max(1, it.size/14), Color: it.color})

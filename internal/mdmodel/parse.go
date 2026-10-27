@@ -2,6 +2,7 @@ package mdmodel
 
 import (
 	"bytes"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,7 +42,8 @@ type builder struct {
 	decor      []Decor
 	nextID     int
 	lastLine   int
-	isTight    []bool // per emitted block: emitted as a tight list paragraph
+	isTight    []bool  // per emitted block: emitted as a tight list paragraph
+	align      []Align // open <div align="..."> wrappers
 }
 
 func (b *builder) lineOf(offset int) int {
@@ -71,6 +73,9 @@ func (b *builder) emit(n ast.Node, blk Block, tight bool) {
 		b.lastLine = b.lineOf(off)
 	}
 	blk.Line = b.lastLine
+	if n := len(b.align); n > 0 && blk.Align == AlignNone {
+		blk.Align = b.align[n-1]
+	}
 	blk.Decor = append([]Decor(nil), b.decor...)
 	b.blocks = append(b.blocks, blk)
 	b.isTight = append(b.isTight, tight)
@@ -148,12 +153,57 @@ func (b *builder) block(n ast.Node) {
 		if n.HasClosure() {
 			raw += "\n" + strings.TrimRight(string(n.ClosureLine.Value(b.src)), "\n")
 		}
-		b.emit(n, Block{Kind: HTML, Spans: []Span{{Text: raw, Mono: true}}}, false)
+		b.htmlBlock(n, raw)
 	case *east.Table:
 		b.table(n)
 	default:
 		b.children(n)
 	}
+}
+
+var (
+	alignOpenRe  = regexp.MustCompile(`(?i)^<(div|p)\s+align\s*=\s*["']?(left|center|right)["']?\s*>$`)
+	alignCloseRe = regexp.MustCompile(`(?i)^</(div|p)>$`)
+	alignWrapRe  = regexp.MustCompile(`(?is)^<(div|p)\s+align\s*=\s*["']?(left|center|right)["']?\s*>(.*)</(div|p)>$`)
+)
+
+func parseAlign(s string) Align {
+	switch strings.ToLower(s) {
+	case "center":
+		return AlignCenter
+	case "right":
+		return AlignRight
+	}
+	return AlignLeft
+}
+
+// htmlBlock handles raw HTML blocks. Alignment wrappers (<div align="...">,
+// as GitHub and Typora use them) align the blocks they contain, comments are
+// hidden, and anything else is shown verbatim.
+func (b *builder) htmlBlock(n ast.Node, raw string) {
+	t := strings.TrimSpace(raw)
+	switch {
+	case strings.HasPrefix(t, "<!--"):
+		return
+	case alignOpenRe.MatchString(t):
+		b.align = append(b.align, parseAlign(alignOpenRe.FindStringSubmatch(t)[2]))
+		return
+	case alignCloseRe.MatchString(t) && len(b.align) > 0:
+		b.align = b.align[:len(b.align)-1]
+		return
+	}
+	if m := alignWrapRe.FindStringSubmatch(t); m != nil {
+		// <p align="center">text</p> on consecutive lines: show the content.
+		b.align = append(b.align, parseAlign(m[2]))
+		for _, blk := range Parse([]byte(m[3])).Blocks {
+			blk.Align = AlignNone
+			blk.Decor = nil
+			b.emit(n, blk, false)
+		}
+		b.align = b.align[:len(b.align)-1]
+		return
+	}
+	b.emit(n, Block{Kind: HTML, Spans: []Span{{Text: raw, Mono: true}}}, false)
 }
 
 func (b *builder) children(n ast.Node) {
@@ -247,6 +297,7 @@ func (b *builder) inlines(n ast.Node) []Span {
 }
 
 func (b *builder) inline(n ast.Node, st Span, out *[]Span) {
+	base := st
 	add := func(s Span, t string) {
 		if t == "" {
 			return
@@ -312,8 +363,27 @@ func (b *builder) inline(n ast.Node, st Span, out *[]Span) {
 			tag := strings.ToLower(strings.ReplaceAll(raw.String(), " ", ""))
 			if strings.HasPrefix(tag, "<br") {
 				add(st, "\n")
+				continue
 			}
-			// Other inline tags are dropped; their text content still shows.
+			// Simple formatting tags style the text that follows them until
+			// the closing tag; other tags are dropped but their text shows.
+			closing := strings.HasPrefix(tag, "</")
+			name := strings.Trim(tag, "</>")
+			if i := strings.IndexAny(name, " /"); i >= 0 {
+				name = name[:i]
+			}
+			switch name {
+			case "u", "ins":
+				st.Underline = !closing || base.Underline
+			case "b", "strong":
+				st.Bold = !closing || base.Bold
+			case "i", "em":
+				st.Italic = !closing || base.Italic
+			case "s", "del", "strike":
+				st.Strike = !closing || base.Strike
+			case "code", "kbd":
+				st.Mono = !closing || base.Mono
+			}
 		case *east.Strikethrough:
 			s := st
 			s.Strike = true

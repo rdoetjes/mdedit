@@ -165,7 +165,7 @@ func (c *Ctx) Block(b, prev *mdmodel.Block, width float32) *Layout {
 	case mdmodel.Image:
 		content, firstBaseline = c.image(b, cw, textColor)
 	default:
-		content, firstBaseline = c.paragraph(b.Spans, cw, textColor)
+		content, firstBaseline = c.paragraph(b.Spans, cw, textColor, b.Align)
 	}
 
 	out := &Layout{Height: gap + content.Height}
@@ -228,11 +228,11 @@ func (c *Ctx) marker(x, baseline float32, d mdmodel.Decor, col color.NRGBA) []Pr
 	}
 }
 
-func (c *Ctx) paragraph(spans []mdmodel.Span, w float32, col color.NRGBA) (*Layout, float32) {
+func (c *Ctx) paragraph(spans []mdmodel.Span, w float32, col color.NRGBA, align mdmodel.Align) (*Layout, float32) {
 	items := c.items(spans, c.Em, col, false)
 	lines, h := c.layoutInline(items, w, c.Em, 1.5, false)
 	l := &Layout{Height: h}
-	c.emitLines(l, items, lines, 0, 0, w, mdmodel.AlignNone, false)
+	c.emitLines(l, items, lines, 0, 0, w, align, false)
 	return l, firstBaseline(lines, c.Em)
 }
 
@@ -250,7 +250,7 @@ func (c *Ctx) heading(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 	items := c.items(spans, size, col, false)
 	lines, h := c.layoutInline(items, w, size, 1.25, false)
 	l := &Layout{Height: h}
-	c.emitLines(l, items, lines, 0, 0, w, mdmodel.AlignNone, false)
+	c.emitLines(l, items, lines, 0, 0, w, b.Align, false)
 	if lvl <= 2 {
 		l.Height += 0.3 * c.Em
 		l.Prims = append(l.Prims, Prim{Kind: PRect, Y: l.Height, W: w, H: max(1, c.Em/16), Color: c.Theme.Border})
@@ -281,7 +281,7 @@ func (c *Ctx) image(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, floa
 		if alt == "" {
 			alt = b.Src
 		}
-		return c.paragraph([]mdmodel.Span{{Text: "[image: " + alt + "]", Italic: true, Link: b.Src}}, w, col)
+		return c.paragraph([]mdmodel.Span{{Text: "[image: " + alt + "]", Italic: true, Link: b.Src}}, w, col, b.Align)
 	}
 	// Treat image pixels as CSS pixels: 16 per em.
 	iw := float32(pw) * c.Em / 16
@@ -294,7 +294,14 @@ func (c *Ctx) image(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, floa
 		iw *= c.MaxImageHeight / ih
 		ih = c.MaxImageHeight
 	}
-	return &Layout{Height: ih, Prims: []Prim{{Kind: PImage, W: iw, H: ih, URL: b.Src}}}, min(ih, c.Em)
+	x := float32(0)
+	switch b.Align {
+	case mdmodel.AlignCenter:
+		x = (w - iw) / 2
+	case mdmodel.AlignRight:
+		x = w - iw
+	}
+	return &Layout{Height: ih, Prims: []Prim{{Kind: PImage, X: x, W: iw, H: ih, URL: b.Src}}}, min(ih, c.Em)
 }
 
 func (c *Ctx) table(t *mdmodel.TableData, w float32, col color.NRGBA) (*Layout, float32) {

@@ -11,18 +11,19 @@ import "image/color"
 
 // Span is a run of inline text with uniform styling.
 type Span struct {
-	Text   string
-	Bold   bool
-	Italic bool
-	Mono   bool // inline code, or any text inside a code block
-	Strike bool
-	Link   string      // link target; empty if not a link
-	Color  color.NRGBA // syntax-highlight colour; zero means the default colour
+	Text      string
+	Bold      bool
+	Italic    bool
+	Mono      bool // inline code, or any text inside a code block
+	Strike    bool
+	Underline bool
+	Link      string      // link target; empty if not a link
+	Color     color.NRGBA // syntax-highlight colour; zero means the default colour
 }
 
 func (s Span) sameStyle(o Span) bool {
 	return s.Bold == o.Bold && s.Italic == o.Italic && s.Mono == o.Mono &&
-		s.Strike == o.Strike && s.Link == o.Link && s.Color == o.Color
+		s.Strike == o.Strike && s.Underline == o.Underline && s.Link == o.Link && s.Color == o.Color
 }
 
 type Kind int
@@ -96,6 +97,8 @@ type Block struct {
 	ID string
 	// Line is the 0-based source line the block starts on.
 	Line int
+	// Align is set for blocks inside <div align="..."> wrappers.
+	Align Align
 	// Gap is the vertical space above the block, in em.
 	Gap float32
 }

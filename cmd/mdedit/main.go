@@ -18,6 +18,8 @@ import (
 
 var version = "dev"
 
+func init() { ui.Version = version }
+
 func main() {
 	pdf := flag.String("pdf", "", "export `file.md` to PDF without opening a window (output next to it, or -o)")
 	out := flag.String("o", "", "output path for -pdf")

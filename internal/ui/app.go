@@ -14,7 +14,6 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/gesture"
-	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -67,10 +66,19 @@ type App struct {
 	drag      gesture.Drag
 	dragStart float32
 
-	btnNew, btnOpen, btnSave, btnSaveAs, btnPDF, btnView widget.Clickable
+	menus       []*menu
+	toolbarCmds []*command
+	bar         menuBar
+	hint        string // status bar text while hovering a toolbar button
+	regions     []widget.Region
 
 	dialog dialog
+	// pending runs on the next frame; used for edits requested from dialogs.
+	pending func(gtx layout.Context)
 }
+
+// Version is shown in the About box.
+var Version = "dev"
 
 // New creates the editor, loading path if it is non-empty. A path that does
 // not exist yet becomes the save destination of a new document.
@@ -80,6 +88,7 @@ func New(path string) (*App, error) {
 	th.Shaper = shaper
 	th.TextSize = 15
 	a := &App{th: th, split: 0.5, lastRow: -1}
+	a.buildCommands()
 	a.preview = NewPreview(shaper)
 	a.preview.OnLink = a.followLink
 	a.editor.WrapPolicy = text.WrapWords
@@ -400,73 +409,22 @@ func (a *App) quit() {
 
 // Layout.
 
-func (a *App) handleShortcuts(gtx layout.Context) {
-	sc := key.ModShortcut
-	filters := []event.Filter{
-		key.Filter{Name: "N", Required: sc},
-		key.Filter{Name: "O", Required: sc},
-		key.Filter{Name: "S", Required: sc},
-		key.Filter{Name: "S", Required: sc | key.ModShift},
-		key.Filter{Name: "E", Required: sc},
-		key.Filter{Name: "Q", Required: sc},
-		key.Filter{Name: "1", Required: sc},
-		key.Filter{Name: "2", Required: sc},
-		key.Filter{Name: "3", Required: sc},
-	}
-	for {
-		ev, ok := gtx.Event(filters...)
-		if !ok {
-			break
-		}
-		e, ok := ev.(key.Event)
-		if !ok || e.State != key.Press {
-			continue
-		}
-		switch e.Name {
-		case "N":
-			a.newDoc()
-		case "O":
-			a.openDialog()
-		case "S":
-			if e.Modifiers.Contain(key.ModShift) {
-				a.saveAs(nil)
-			} else {
-				a.save(nil)
-			}
-		case "E":
-			a.exportDialog()
-		case "Q":
-			a.quit()
-		case "1":
-			a.view = viewSplit
-		case "2":
-			a.view = viewEditor
-		case "3":
-			a.view = viewPreview
-		}
-	}
-}
-
 func (a *App) layout(gtx layout.Context) {
 	if a.dialog == nil {
-		a.handleShortcuts(gtx)
-		if a.btnNew.Clicked(gtx) {
-			a.newDoc()
+		if a.bar.open < 0 {
+			a.handleShortcuts(gtx)
 		}
-		if a.btnOpen.Clicked(gtx) {
-			a.openDialog()
+		// These keys must be handled before the editor sees them.
+		a.handleEnter(gtx)
+		a.handleMacKeys(gtx)
+		for _, c := range a.toolbarCmds {
+			if c != nil && c.click.Clicked(gtx) {
+				c.run(gtx)
+			}
 		}
-		if a.btnSave.Clicked(gtx) {
-			a.save(nil)
-		}
-		if a.btnSaveAs.Clicked(gtx) {
-			a.saveAs(nil)
-		}
-		if a.btnPDF.Clicked(gtx) {
-			a.exportDialog()
-		}
-		if a.btnView.Clicked(gtx) {
-			a.view = (a.view + 1) % 3
+		if p := a.pending; p != nil {
+			a.pending = nil
+			p(gtx)
 		}
 	}
 	for {
@@ -482,17 +440,23 @@ func (a *App) layout(gtx layout.Context) {
 
 	size := gtx.Constraints.Max
 	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return a.bar.Layout(gtx, a.th, a.menus, a.dialog == nil)
+		}),
 		layout.Rigid(a.toolbar),
 		layout.Flexed(1, a.body),
 		layout.Rigid(a.statusBar),
 	)
+	gtx.Constraints = layout.Exact(size)
 	if a.dialog != nil {
-		gtx.Constraints = layout.Exact(size)
 		a.dialog.Layout(gtx, a.th)
+	} else {
+		a.bar.Overlay(gtx, a.th, a.menus)
 	}
 }
 
 func (a *App) toolbar(gtx layout.Context) layout.Dimensions {
+	a.hint = ""
 	return layout.Background{}.Layout(gtx,
 		func(gtx layout.Context) layout.Dimensions {
 			sz := gtx.Constraints.Min
@@ -502,38 +466,42 @@ func (a *App) toolbar(gtx layout.Context) layout.Dimensions {
 		},
 		func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Top: 6, Bottom: 6, Left: 8, Right: 8}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				btn := func(c *widget.Clickable, label string) layout.FlexChild {
-					return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return layout.Inset{Right: 6}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							return smallButton(gtx, a.th, c, label)
+			return layout.Inset{Top: 3, Bottom: 4, Left: 8, Right: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				var children []layout.FlexChild
+				for _, c := range a.toolbarCmds {
+					if c == nil {
+						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							w, h := gtx.Dp(17), gtx.Dp(30)
+							paint.FillShape(gtx.Ops, dividerCol, clip.Rect{Min: image.Pt(w/2, gtx.Dp(5)), Max: image.Pt(w/2+1, h-gtx.Dp(5))}.Op())
+							return layout.Dimensions{Size: image.Pt(w, h)}
+						}))
+						continue
+					}
+					children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if c.click.Hovered() {
+							a.hint = c.tooltip()
+						}
+						return layout.Inset{Right: 2}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return iconButton(gtx, &c.click, c.icon)
 						})
-					})
+					}))
 				}
-				viewLabel := [...]string{"View: Split", "View: Editor", "View: Preview"}[a.view]
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					btn(&a.btnNew, "New"),
-					btn(&a.btnOpen, "Open"),
-					btn(&a.btnSave, "Save"),
-					btn(&a.btnSaveAs, "Save As"),
-					btn(&a.btnPDF, "Export PDF"),
-					btn(&a.btnView, viewLabel),
-					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-						name := "Untitled"
-						if a.path != "" {
-							name = a.path
-						}
-						if a.dirty {
-							name += "  •"
-						}
-						l := material.Body2(a.th, name)
-						l.Color = statusFg
-						l.MaxLines = 1
-						l.Alignment = text.End
-						gtx.Constraints.Min.X = gtx.Constraints.Max.X
-						return l.Layout(gtx)
-					}),
-				)
+				children = append(children, layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+					name := "Untitled"
+					if a.path != "" {
+						name = a.path
+					}
+					if a.dirty {
+						name += "  •"
+					}
+					l := material.Body2(a.th, name)
+					l.Color = statusFg
+					l.MaxLines = 1
+					l.Alignment = text.End
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
+					return l.Layout(gtx)
+				}))
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 			})
 		})
 }
@@ -550,8 +518,10 @@ func (a *App) statusBar(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
 			return layout.Inset{Top: 4, Bottom: 4, Left: 10, Right: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				msg := a.status
-				if msg == "" || time.Since(a.statusTime) > 8*time.Second {
-					msg = "Ctrl+O open · Ctrl+S save · Ctrl+E export PDF · Ctrl+1/2/3 split/editor/preview"
+				if a.hint != "" {
+					msg = a.hint
+				} else if msg == "" || time.Since(a.statusTime) > 8*time.Second {
+					msg = "Ctrl+O open · Ctrl+S save · Ctrl+E export PDF · Ctrl+/ switch view"
 					if key.ModShortcut == key.ModCommand {
 						msg = strings.ReplaceAll(msg, "Ctrl+", "⌘")
 					}

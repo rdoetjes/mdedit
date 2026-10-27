@@ -19,14 +19,29 @@ GPU libraries at run time.
     mdedit [file.md]                   # edit (a missing file is created on save)
     mdedit -pdf file.md [-o out.pdf]   # export without opening a window
 
-| Shortcut (⌘ on macOS)  | Action                                  |
-|------------------------|-----------------------------------------|
-| Ctrl+N                 | New document                            |
-| Ctrl+O                 | Open                                    |
-| Ctrl+S / Ctrl+Shift+S  | Save / Save as                          |
-| Ctrl+E                 | Export PDF                              |
-| Ctrl+1 / 2 / 3         | Split view / editor only / preview only |
-| Ctrl+Q                 | Quit                                    |
+All commands are in the menu bar (File, Edit, Format, Insert, View, Help);
+the toolbar holds the common ones: bold, italic, underline, alignment,
+numbered/bullet lists and table. Main shortcuts (⌘ instead of Ctrl on macOS):
+
+| Shortcut               | Action                    | Shortcut          | Action           |
+|------------------------|---------------------------|-------------------|------------------|
+| Ctrl+N / Ctrl+O        | New / Open                | Ctrl+B / I / U    | Bold / Italic / Underline |
+| Ctrl+S / Ctrl+Shift+S  | Save / Save as            | Ctrl+Shift+L/E/R  | Align left / center / right |
+| Ctrl+E                 | Export PDF                | Ctrl+1 … 6, Ctrl+0 | Heading 1–6 / paragraph |
+| Ctrl+/                 | Cycle split/editor/preview | Ctrl+T           | Insert table     |
+| Ctrl+Q                 | Quit                      | Ctrl+K / Ctrl+Shift+K | Link / code block |
+
+Pressing Enter in a list item or quote starts the next item (numbers count
+up); Enter on an empty item ends the list. Shift+Enter inserts a plain line
+break.
+
+On macOS the usual ⌘ navigation works in the editor: ⌘←/⌘→ to the start/end
+of the line, ⌘↑/⌘↓ to the start/end of the document (add ⇧ to select), and
+⌘⌫ to delete to the start of the line. Home/End (fn+←/→) work everywhere.
+
+Markdown has no underline or alignment syntax, so mdedit uses the HTML that
+GitHub and Typora render: `<u>text</u>`, and a `<div align="center">` wrapper
+with blank lines inside so the content is still parsed as Markdown.
 
 The divider between editor and preview can be dragged. The preview follows
 the caret. Clicking a `#anchor` link jumps to the heading, relative `.md`
