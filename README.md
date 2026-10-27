@@ -1,8 +1,7 @@
 # MDEdit
 
 A Markdown editor with a live, GitHub-styled preview and PDF export, written
-in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and
-Wayland), FreeBSD, macOS and Windows.
+in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and Wayland), FreeBSD, macOS and Windows.
 
 ![Screenshot](./screenshot.png)
 
