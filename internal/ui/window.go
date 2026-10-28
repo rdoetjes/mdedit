@@ -50,6 +50,7 @@ func (a *App) handleInput(gtx layout.Context) {
 	a.handleTab(gtx)
 	a.handleMacKeys(gtx)
 	a.handleToolbar(gtx)
+	a.find.handleInput(gtx)
 	a.runPending(gtx)
 }
 

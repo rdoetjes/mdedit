@@ -82,9 +82,24 @@ func (a *App) editorPane(gtx layout.Context) layout.Dimensions {
 	if a.dialog == nil && !gtx.Focused(&a.editor) && a.lastRow < 0 {
 		gtx.Execute(key.FocusCmd{Tag: &a.editor})
 	}
-	dims := layout.Inset{Top: 12, Bottom: 12, Left: 14, Right: 10}.Layout(gtx, a.editorView)
+	dims := layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(a.findBarRow),
+		layout.Flexed(1, a.editorArea),
+	)
 	a.followCaret()
 	return dims
+}
+
+// findBarRow shows the search bar above the editor while it is open.
+func (a *App) findBarRow(gtx layout.Context) layout.Dimensions {
+	if !a.find.open {
+		return layout.Dimensions{}
+	}
+	return a.find.layout(gtx)
+}
+
+func (a *App) editorArea(gtx layout.Context) layout.Dimensions {
+	return layout.Inset{Top: 12, Bottom: 12, Left: 14, Right: 10}.Layout(gtx, a.editorView)
 }
 
 func (a *App) editorView(gtx layout.Context) layout.Dimensions {
@@ -94,7 +109,9 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	e.TextSize = 14
 	e.LineHeightScale = 1.35
 	e.SelectionColor = selectColor
-	return e.Layout(gtx)
+	dims := e.Layout(gtx)
+	a.find.highlight(gtx)
+	return dims
 }
 
 // followCaret keeps the preview showing the block the caret is in.

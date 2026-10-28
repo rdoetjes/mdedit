@@ -100,7 +100,7 @@ func (p *popup) measureWidth(gtx layout.Context) int {
 	w := gtx.Dp(220)
 	for _, c := range p.items {
 		if c != nil {
-			w = max(w, measureLabel(gtx, p.th, c.label)+measureLabel(gtx, p.th, c.shortcut())+gtx.Dp(64))
+			w = max(w, measureLabel(gtx, p.th, c.label)+measureLabel(gtx, p.th, c.shortcut())+gtx.Dp(64+menuIconW))
 		}
 	}
 	return w
@@ -185,9 +185,25 @@ func (r popupRow) content(gtx layout.Context) layout.Dimensions {
 
 func (r popupRow) labels(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(r.icon),
 		layout.Flexed(1, r.label),
 		layout.Rigid(r.shortcut),
 	)
+}
+
+// menuIconW is the width of the icon column in menus, in dp.
+const menuIconW = 26
+
+// icon draws the item's icon, or leaves its space empty.
+func (r popupRow) icon(gtx layout.Context) layout.Dimensions {
+	size := image.Pt(gtx.Dp(menuIconW), gtx.Dp(18))
+	ic := r.p.items[r.i].icon
+	if ic == nil {
+		return layout.Dimensions{Size: size}
+	}
+	gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(18), gtx.Dp(18)))
+	ic.Layout(gtx, statusFg)
+	return layout.Dimensions{Size: size}
 }
 
 func (r popupRow) label(gtx layout.Context) layout.Dimensions {

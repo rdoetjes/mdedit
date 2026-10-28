@@ -50,6 +50,14 @@ numbered/bullet lists and table. Main shortcuts (⌘ instead of Ctrl on macOS):
 | Ctrl+E                 | Export PDF                | Ctrl+1 … 6, Ctrl+0 | Heading 1–6 / paragraph |
 | Ctrl+/                 | Cycle split/editor/preview | Ctrl+T           | Insert table     |
 | Ctrl+Q                 | Quit                      | Ctrl+K / Ctrl+Shift+K | Link / code block |
+| Ctrl+F / Ctrl+R        | Find / Replace            | Ctrl+G / Ctrl+Shift+G | Next / previous match |
+
+Find (Ctrl+F) and Replace (Ctrl+R) open a bar above the editor; the
+selected text becomes the search text. All matches are highlighted, the
+counter shows "3 of 12", Enter and Shift+Enter go to the next and previous
+match (wrapping around), and Escape closes the bar. Matching ignores case
+unless Match case is ticked. Replace replaces the selected match and moves
+to the next; Replace All replaces every match in one undoable step.
 
 Pressing Enter in a list item or quote starts the next item (numbers count
 up); Enter on an empty item ends the list. Shift+Enter inserts a plain line

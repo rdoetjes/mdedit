@@ -53,13 +53,23 @@ type tableSize struct{ cols, rows int }
 
 func (t tableSize) apply(s edit.State) edit.State { return edit.Table(s, t.cols, t.rows) }
 
-// applyEdit runs a formatting function on the editor contents. The change is
-// applied as a single replacement of the part that differs, so it becomes
-// one undo step.
+// applyEdit runs a formatting function on the editor contents and gives
+// the editor the keyboard focus.
 func (a *App) applyEdit(gtx layout.Context, f editFunc) {
+	a.setEditorState(f(a.editorState()))
+	gtx.Execute(key.FocusCmd{Tag: &a.editor})
+}
+
+// editorState returns the editor text and selection.
+func (a *App) editorState() edit.State {
 	s, e := a.editor.Selection()
+	return edit.New(a.editor.Text(), s, e)
+}
+
+// setEditorState changes the editor to ns. The change is applied as a
+// single replacement of the part that differs, so it becomes one undo step.
+func (a *App) setEditorState(ns edit.State) {
 	old := []rune(a.editor.Text())
-	ns := f(edit.New(string(old), s, e))
 	p, q := commonPrefix(old, ns.Text), commonSuffix(old, ns.Text)
 	if p != len(old) || p != len(ns.Text) {
 		q = min(q, len(old)-p, len(ns.Text)-p)
@@ -68,7 +78,6 @@ func (a *App) applyEdit(gtx layout.Context, f editFunc) {
 		a.reparse()
 	}
 	a.editor.SetCaret(ns.End, ns.Start)
-	gtx.Execute(key.FocusCmd{Tag: &a.editor})
 }
 
 func commonPrefix(a, b []rune) int {

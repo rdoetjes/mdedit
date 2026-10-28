@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gioui.org/gpu/headless"
+	"gioui.org/io/key"
 )
 
 // TestScreenshot renders the window offscreen to PNG files. Set MDEDIT_SHOT
@@ -24,6 +25,7 @@ func TestScreenshot(t *testing.T) {
 	}
 	s := &shooter{h: h, w: w, dir: dir}
 	s.previewScenes()
+	s.findScenes()
 	s.overlayScenes()
 	s.contentScenes()
 }
@@ -81,6 +83,25 @@ func (s *shooter) overlayScenes() {
 }
 
 func ignorePath(string) {}
+
+// findScenes shows the replace bar with matches highlighted, and the Edit
+// menu with the find commands.
+func (s *shooter) findScenes() {
+	a := s.h.a
+	a.preview.ScrollToBlock(0)
+	a.editor.SetCaret(0, 0)
+	s.h.press("R", key.ModShortcut)
+	a.find.query.SetText("markdown")
+	a.find.repl.SetText("Markdown")
+	s.h.frame()
+	s.h.press(key.NameReturn, 0)
+	s.h.press(key.NameReturn, 0)
+	s.shot("find-replace.png")
+	s.h.press(key.NameEscape, 0)
+	a.bar.open = 1 // Edit
+	s.shot("menu-edit.png")
+	a.bar.open = -1
+}
 
 func (s *shooter) contentScenes() {
 	s.scene("align.png", alignSample)

@@ -68,6 +68,8 @@ type App struct {
 	hint        string // status bar text while hovering a toolbar button
 	regions     []widget.Region
 	ctx         contextMenu
+	find        findBar
+	version     int // counts text changes, to know when to search again
 
 	dialog dialog
 	flow   flow
@@ -92,6 +94,8 @@ func New(path string) (*App, error) {
 	a.preview = NewPreview(shaper)
 	a.preview.OnLink = a.followLink
 	a.editor.WrapPolicy = text.WrapWords
+	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
+	a.find.init(a)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}
@@ -138,6 +142,7 @@ func (a *App) load(path, content string) {
 
 func (a *App) reparse() {
 	txt := a.editor.Text()
+	a.version++
 	a.doc = mdmodel.Parse([]byte(txt))
 	a.preview.SetDocument(a.doc)
 	a.dirty = txt != a.saved

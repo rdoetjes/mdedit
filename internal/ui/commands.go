@@ -82,6 +82,7 @@ type commands struct {
 	numbered, bullets, table *command
 	cut, copy, paste         *command
 	insertTOC, updateTOC     *command
+	find, replace            *command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -117,6 +118,8 @@ func (a *App) buildSharedCommands() {
 	c.paste = &command{label: "Paste", key: "V", native: true, run: a.paste}
 	c.insertTOC = a.editCommand("Table of Contents", "", 0, edit.InsertTOC)
 	c.updateTOC = newCommand("Update Table of Contents", "", 0, a.cmdUpdateTOC)
+	c.find = newCommand("Find…", "F", 0, a.cmdFind)
+	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
 
 func (a *App) buildToolbar() {
@@ -130,9 +133,11 @@ func (a *App) buildToolbar() {
 	c.numbered.icon = mustIcon(icons.EditorFormatListNumbered)
 	c.bullets.icon = mustIcon(icons.EditorFormatListBulleted)
 	c.table.icon = mustIcon(icons.EditorBorderAll)
+	c.find.icon = mustIcon(icons.ActionSearch)
+	c.replace.icon = mustIcon(icons.ActionFindReplace)
 	// Groups are separated by nil.
 	a.toolbarCmds = []*command{c.bold, c.italic, c.underline, nil, c.left, c.center, c.right,
-		nil, c.numbered, c.bullets, c.table}
+		nil, c.numbered, c.bullets, c.table, nil, c.find, c.replace}
 }
 
 func (a *App) fileMenu() *menu {
@@ -154,6 +159,10 @@ func (a *App) editMenu() *menu {
 		a.cmds.cut, a.cmds.copy, a.cmds.paste,
 		nil,
 		{label: "Select All", key: "A", native: true, run: a.selectAll},
+		nil,
+		a.cmds.find, a.cmds.replace,
+		newCommand("Find Next", "G", 0, a.cmdFindNext),
+		newCommand("Find Previous", "G", key.ModShift, a.cmdFindPrev),
 	}}
 }
 
@@ -240,6 +249,24 @@ func (a *App) cmdTable(layout.Context)  { a.tableDialog() }
 func (a *App) cmdAbout(layout.Context)  { a.about() }
 
 func (a *App) cmdCycleView(layout.Context) { a.view = (a.view + 1) % 3 }
+
+func (a *App) cmdFind(gtx layout.Context)    { a.find.show(gtx, false) }
+func (a *App) cmdReplace(gtx layout.Context) { a.find.show(gtx, true) }
+
+// cmdFindNext goes to the next match, opening the bar if it is closed.
+func (a *App) cmdFindNext(gtx layout.Context) {
+	if !a.find.open {
+		a.find.show(gtx, false)
+	}
+	a.find.findNext()
+}
+
+func (a *App) cmdFindPrev(gtx layout.Context) {
+	if !a.find.open {
+		a.find.show(gtx, false)
+	}
+	a.find.findPrev()
+}
 
 func (a *App) cmdMarkdownHelp(layout.Context) { a.openExternal("https://commonmark.org/help/") }
 
