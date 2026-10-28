@@ -146,6 +146,9 @@ PORT ?= 8080
 # make wasm SERVER_GOOS=freebsd SERVER_GOARCH=amd64
 SERVER_GOOS   ?=
 SERVER_GOARCH ?=
+# Brotli quality: 9 takes seconds; 11 is about 15 % smaller but can take
+# many minutes on the 30 MB .wasm (make wasm BROTLI_Q=11).
+BROTLI_Q ?= 9
 
 wasm:
 	@mkdir -p $(WEB)
@@ -158,7 +161,7 @@ wasm:
 	cp assets/icons/64x64/apps/mdedit.png $(WEB)/icon.png
 	gzip -9 -k -f $(WEB)/mdedit.wasm $(WEB)/wasm_exec.js $(WEB)/index.html
 	@if command -v brotli >/dev/null 2>&1; then \
-		echo "brotli -q 11 $(WEB)/mdedit.wasm"; brotli -f -k -q 11 $(WEB)/mdedit.wasm; \
+		echo "brotli -q $(BROTLI_Q) $(WEB)/mdedit.wasm"; brotli -f -k -q $(BROTLI_Q) -w 24 $(WEB)/mdedit.wasm; \
 	fi
 	CGO_ENABLED=0 GOOS=$(SERVER_GOOS) GOARCH=$(SERVER_GOARCH) $(GO) build -buildvcs=false -trimpath -ldflags '-s -w' -o bin/mdedit-web ./cmd/mdedit-web
 	@echo "Built $(WEB) and bin/mdedit-web; try: make serve"

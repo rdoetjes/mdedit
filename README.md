@@ -181,7 +181,7 @@ with a different way of reaching files.
 `bin/web` holds `index.html`, `mdedit.wasm` (with compressed `.gz` and, if
 the `brotli` command exists, `.br` copies), Go's `wasm_exec.js` and the icon.
 Any web server can serve it if it sends `.wasm` files as `application/wasm`;
-`mdedit-web` does that and sends the compressed copies (about 5–8 MB instead
+`mdedit-web` does that and sends the compressed copies (about 6–8 MB instead
 of 30 MB).
 
 **In a FreeBSD jail.** On the FreeBSD host, build as yourself, then install
@@ -224,7 +224,7 @@ does HTTPS.
   Table. There is no Quit; close the tab.
 - **Theme.** The first visit follows the browser's light or dark mode;
   View → Dark Theme is remembered in the browser.
-- **Size.** The first visit downloads about 5–8 MB; after that the
+- **Size.** The first visit downloads about 6–8 MB; after that the
   browser's cache is used until a new version is installed.
 
 ## Supported Markdown

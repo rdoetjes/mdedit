@@ -1623,8 +1623,9 @@ machine, mdedit's copy and paste do nothing — serve it over HTTPS.
    fonts);
 2. copies Go's `wasm_exec.js` (from `$(go env GOROOT)/lib/wasm`, or
    `misc/wasm` for older Go), `web/index.html` and the icon;
-3. compresses: `.gz` always, `.br` if `brotli` is installed (about 8 and
-   5 MB);
+3. compresses: `.gz` always (about 8 MB), `.br` if `brotli` is installed
+   (about 6 MB at the default `BROTLI_Q=9`, which takes seconds; 11 saves
+   another MB but takes minutes);
 4. builds `bin/mdedit-web` for this machine, without cgo.
 
 `cmd/mdedit-web` is a small static server: for each request it sends the
