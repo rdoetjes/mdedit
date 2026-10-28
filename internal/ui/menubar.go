@@ -2,7 +2,6 @@ package ui
 
 import (
 	"image"
-	"image/color"
 
 	"gioui.org/layout"
 	"gioui.org/widget"
@@ -20,11 +19,6 @@ type menuBar struct {
 	popup  popup
 	barH   int
 }
-
-var (
-	menuHover = color.NRGBA{R: 0xe8, G: 0xf0, B: 0xfe, A: 0xff}
-	menuOpen  = color.NRGBA{R: 0xdd, G: 0xe3, B: 0xea, A: 0xff}
-)
 
 func (m *menuBar) ensure() {
 	if len(m.titles) != len(m.menus) {
@@ -70,7 +64,7 @@ func (m *menuBar) toggle(i int) {
 }
 
 func barBackground(gtx layout.Context) layout.Dimensions {
-	fillRect(gtx, toolbarBg, image.Rectangle{Max: gtx.Constraints.Min})
+	fillRect(gtx, col.toolbarBg, image.Rectangle{Max: gtx.Constraints.Min})
 	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
 
@@ -135,9 +129,9 @@ func (t menuTitle) background(gtx layout.Context) layout.Dimensions {
 	r := image.Rectangle{Max: gtx.Constraints.Min}
 	switch {
 	case t.m.open == t.i:
-		fillRoundRect(gtx, menuOpen, r, gtx.Dp(4))
+		fillRoundRect(gtx, col.menuOpen, r, gtx.Dp(4))
 	case t.m.titles[t.i].Hovered():
-		fillRoundRect(gtx, menuHover, r, gtx.Dp(4))
+		fillRoundRect(gtx, col.menuHover, r, gtx.Dp(4))
 	}
 	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
@@ -148,6 +142,6 @@ func (t menuTitle) label(gtx layout.Context) layout.Dimensions {
 
 func (t menuTitle) text(gtx layout.Context) layout.Dimensions {
 	l := material.Body2(t.m.th, t.m.menus[t.i].title)
-	l.Color = buttonFg
+	l.Color = col.buttonFg
 	return l.Layout(gtx)
 }

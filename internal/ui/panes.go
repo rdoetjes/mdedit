@@ -68,8 +68,8 @@ func (a *App) handleDividerDrag(gtx layout.Context, width int) {
 func (a *App) divider(gtx layout.Context, x, w, h int) {
 	st := op.Offset(image.Pt(x, 0)).Push(gtx.Ops)
 	r := image.Rect(0, 0, w, h)
-	fillRect(gtx, toolbarBg, r)
-	fillRect(gtx, dividerCol, image.Rect(w/2, 0, w/2+1, h))
+	fillRect(gtx, col.toolbarBg, r)
+	fillRect(gtx, col.dividerCol, image.Rect(w/2, 0, w/2+1, h))
 	area := clip.Rect(r).Push(gtx.Ops)
 	pointer.CursorColResize.Add(gtx.Ops)
 	a.drag.Add(gtx.Ops)
@@ -78,7 +78,7 @@ func (a *App) divider(gtx layout.Context, x, w, h int) {
 }
 
 func (a *App) editorPane(gtx layout.Context) layout.Dimensions {
-	fillRect(gtx, editorBg, image.Rectangle{Max: gtx.Constraints.Max})
+	fillRect(gtx, col.editorBg, image.Rectangle{Max: gtx.Constraints.Max})
 	if a.dialog == nil && !gtx.Focused(&a.editor) && a.lastRow < 0 {
 		gtx.Execute(key.FocusCmd{Tag: &a.editor})
 	}
@@ -108,7 +108,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	e.Font = font.Font{Typeface: "Go Mono"}
 	e.TextSize = 14
 	e.LineHeightScale = 1.35
-	e.SelectionColor = selectColor
+	e.SelectionColor = col.selectColor
 	dims := e.Layout(gtx)
 	a.find.highlight(gtx)
 	return dims

@@ -64,6 +64,14 @@ func (p *Preview) SetDocument(doc *mdmodel.Document) {
 	}
 }
 
+// SetTheme changes the colours of the preview.
+func (p *Preview) SetTheme(t *render.Theme) {
+	p.ctx.Theme = t
+	if p.doc != nil {
+		p.cache = make([]*render.Layout, len(p.doc.Blocks))
+	}
+}
+
 // ScrollToBlock scrolls so block i is at the top.
 func (p *Preview) ScrollToBlock(i int) {
 	p.list.Position.First = i + 1 // index 0 is the top padding
@@ -83,7 +91,7 @@ func (p *Preview) EnsureVisible(i int) {
 const maxContentWidth = unit.Dp(880)
 
 func (p *Preview) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions {
-	fillRect(gtx, render.Light.Bg, image.Rectangle{Max: gtx.Constraints.Max})
+	fillRect(gtx, p.ctx.Theme.Bg, image.Rectangle{Max: gtx.Constraints.Max})
 	if p.doc == nil {
 		return layout.Dimensions{Size: gtx.Constraints.Max}
 	}

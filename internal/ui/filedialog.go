@@ -329,7 +329,7 @@ func (d *FileDialog) errorLine(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{}
 	}
 	l := material.Body2(d.th, d.err)
-	l.Color = errorColor
+	l.Color = col.errorColor
 	return layout.Inset{Bottom: 8}.Layout(gtx, l.Layout)
 }
 
@@ -365,7 +365,7 @@ type fileRow struct {
 
 func (r fileRow) layout(gtx layout.Context) layout.Dimensions {
 	if r.highlighted() {
-		fillRect(gtx, highlightBg, image.Rect(0, 0, gtx.Constraints.Max.X, gtx.Dp(28)))
+		fillRect(gtx, col.highlightBg, image.Rect(0, 0, gtx.Constraints.Max.X, gtx.Dp(28)))
 	}
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	return layout.Inset{Left: 8, Right: 8, Top: 4, Bottom: 4}.Layout(gtx, r.label)

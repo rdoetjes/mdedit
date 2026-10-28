@@ -131,7 +131,7 @@ func (d *VideoDialog) errorLine(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{}
 	}
 	l := material.Body2(d.th, d.err)
-	l.Color = errorColor
+	l.Color = col.errorColor
 	return layout.Inset{Top: 10}.Layout(gtx, l.Layout)
 }
 

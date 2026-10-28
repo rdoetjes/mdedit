@@ -33,6 +33,46 @@ func TestScreenshot(t *testing.T) {
 	s.findScenes()
 	s.overlayScenes()
 	s.contentScenes()
+	s.darkScenes()
+}
+
+// darkScenes repeats the main scenes in the dark theme.
+func (s *shooter) darkScenes() {
+	a := s.h.a
+	a.setDark(true)
+	defer a.setDark(false)
+	src, err := os.ReadFile("../mdmodel/testdata/TEST.md")
+	if err != nil {
+		s.h.t.Fatal(err)
+	}
+	s.scene("dark-split.png", string(src))
+	a.preview.ScrollToBlock(a.doc.HeadingIndex("code-blocks"))
+	a.bar.open = 2 // Format
+	s.shot("dark-menu.png")
+	a.bar.open = -1
+	s.h.frame() // closing a menu takes a frame before shortcuts listen again
+	s.h.press("R", key.ModShortcut)
+	a.find.query.SetText("code")
+	s.h.frame()
+	s.h.press(key.NameReturn, 0)
+	s.shot("dark-find.png")
+	s.h.press(key.NameEscape, 0)
+	s.scene("dark-highlight.png", highlightSample)
+	s.darkMaths()
+	a.tableDialog()
+	s.shot("dark-dialog.png")
+	a.dialog = nil
+}
+
+func (s *shooter) darkMaths() {
+	if src, err := os.ReadFile("../mdmodel/testdata/maths.md"); err == nil {
+		s.h.a.view = viewPreview
+		s.scene("dark-maths.png", string(src))
+		s.h.a.view = viewSplit
+	}
+	if src, err := os.ReadFile("../mdmodel/testdata/videos.md"); err == nil {
+		s.scene("dark-videos.png", string(src))
+	}
 }
 
 // shooter saves screenshots of the harness's window.

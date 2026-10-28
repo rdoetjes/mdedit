@@ -55,6 +55,7 @@ type App struct {
 	status     string
 	statusTime time.Time
 
+	dark      bool
 	view      viewMode
 	split     float32
 	drag      gesture.Drag
@@ -103,6 +104,7 @@ func New(path string) (*App, error) {
 	a.editor.WrapPolicy = text.WrapWords
 	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
 	a.find.init(a)
+	a.setDark(startDark(loadSettings()))
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

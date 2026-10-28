@@ -2,6 +2,9 @@ package render
 
 import (
 	"image/color"
+
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/styles"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -57,12 +60,23 @@ func (c *Ctx) item(s mdmodel.Span, size float32, col color.NRGBA, code bool) inl
 		it.span.Text = strings.ReplaceAll(s.Text, "\t", "    ")
 	}
 	switch {
-	case s.Color != (color.NRGBA{}):
-		it.color = s.Color
+	case s.Highlighted:
+		c.applyCodeStyle(&it)
 	case s.Link != "":
 		it.color = c.Theme.Link
 	}
 	return it
+}
+
+// applyCodeStyle colours a highlighted code token with the theme's chroma
+// style.
+func (c *Ctx) applyCodeStyle(it *inlineItem) {
+	e := styles.Get(c.Theme.CodeStyle).Get(it.span.Token)
+	if e.Colour.IsSet() {
+		it.color = color.NRGBA{R: e.Colour.Red(), G: e.Colour.Green(), B: e.Colour.Blue(), A: 0xff}
+	}
+	it.font.Bold = it.font.Bold || e.Bold == chroma.Yes
+	it.font.Italic = it.font.Italic || e.Italic == chroma.Yes
 }
 
 // tokens splits s into words with their trailing spaces, and lone "\n"

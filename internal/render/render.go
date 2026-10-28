@@ -109,7 +109,9 @@ type Theme struct {
 	Text, Muted, Link, Border color.NRGBA
 	CodeBg, InlineCodeBg      color.NRGBA
 	TableAltBg, CheckFill, Bg color.NRGBA
-	Error                     color.NRGBA
+	CheckMark, Error          color.NRGBA
+	// CodeStyle is the chroma style that colours highlighted code.
+	CodeStyle string
 }
 
 func rgb(c uint32) color.NRGBA {
@@ -127,7 +129,25 @@ var Light = Theme{
 	TableAltBg:   rgb(0xf6f8fa),
 	CheckFill:    rgb(0x0969da),
 	Bg:           rgb(0xffffff),
+	CheckMark:    rgb(0xffffff),
 	Error:        rgb(0xcf222e),
+	CodeStyle:    "github",
+}
+
+// Dark is a theme modelled on GitHub's dark mode.
+var Dark = Theme{
+	Text:         rgb(0xe6edf3),
+	Muted:        rgb(0x9198a1),
+	Link:         rgb(0x4493f8),
+	Border:       rgb(0x3d444d),
+	CodeBg:       rgb(0x151b23),
+	InlineCodeBg: rgb(0x262c36),
+	TableAltBg:   rgb(0x151b23),
+	CheckFill:    rgb(0x1f6feb),
+	Bg:           rgb(0x0d1117),
+	CheckMark:    rgb(0xffffff),
+	Error:        rgb(0xf85149),
+	CodeStyle:    "github-dark",
 }
 
 // Heading font sizes relative to the base size, as on GitHub.
@@ -146,8 +166,8 @@ func (c *Ctx) marker(x, baseline float32, d mdmodel.Decor, col color.NRGBA) []Pr
 		if d.Task == mdmodel.TaskDone {
 			return []Prim{
 				{Kind: PRect, X: bx, Y: by, W: s, H: s, Radius: 0.15 * em, Color: c.Theme.CheckFill},
-				{Kind: PLine, X: bx + 0.2*s, Y: by + 0.52*s, W: bx + 0.42*s, H: by + 0.74*s, Stroke: 0.12 * em, Color: c.Theme.Bg},
-				{Kind: PLine, X: bx + 0.42*s, Y: by + 0.74*s, W: bx + 0.8*s, H: by + 0.28*s, Stroke: 0.12 * em, Color: c.Theme.Bg},
+				{Kind: PLine, X: bx + 0.2*s, Y: by + 0.52*s, W: bx + 0.42*s, H: by + 0.74*s, Stroke: 0.12 * em, Color: c.Theme.CheckMark},
+				{Kind: PLine, X: bx + 0.42*s, Y: by + 0.74*s, W: bx + 0.8*s, H: by + 0.28*s, Stroke: 0.12 * em, Color: c.Theme.CheckMark},
 			}
 		}
 		return []Prim{{Kind: PRect, X: bx, Y: by, W: s, H: s, Radius: 0.15 * em, Stroke: 0.08 * em, Color: c.Theme.Muted}}

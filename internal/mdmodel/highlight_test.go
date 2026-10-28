@@ -1,7 +1,7 @@
 package mdmodel
 
 import (
-	"image/color"
+	"github.com/alecthomas/chroma/v2"
 	"testing"
 )
 
@@ -37,14 +37,16 @@ func TestHighlightLanguages(t *testing.T) {
 			t.Errorf("%s: text changed: %q", lang, text)
 		}
 	}
-	if s := Highlight("no-such-language", "x"); len(s) != 1 || s[0].Color != (color.NRGBA{}) {
+	if s := Highlight("no-such-language", "x"); len(s) != 1 || s[0].Highlighted {
 		t.Errorf("unknown language should be plain, got %+v", s)
 	}
 }
 
+// anyColored reports whether any span is a token the theme colours, i.e.
+// not plain text.
 func anyColored(spans []Span) bool {
 	for _, s := range spans {
-		if s.Color != (color.NRGBA{}) {
+		if s.Highlighted && s.Token != chroma.Text && s.Token != chroma.TextWhitespace {
 			return true
 		}
 	}

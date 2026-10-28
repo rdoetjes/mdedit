@@ -23,8 +23,8 @@ func (a *App) statusBar(gtx layout.Context) layout.Dimensions {
 
 func barWithTopLine(gtx layout.Context) layout.Dimensions {
 	sz := gtx.Constraints.Min
-	fillRect(gtx, toolbarBg, image.Rectangle{Max: sz})
-	fillRect(gtx, dividerCol, image.Rect(0, 0, sz.X, 1))
+	fillRect(gtx, col.toolbarBg, image.Rectangle{Max: sz})
+	fillRect(gtx, col.dividerCol, image.Rect(0, 0, sz.X, 1))
 	return layout.Dimensions{Size: sz}
 }
 
@@ -42,7 +42,7 @@ func (a *App) statusRow(gtx layout.Context) layout.Dimensions {
 
 func (a *App) statusMessage(gtx layout.Context) layout.Dimensions {
 	l := material.Caption(a.th, a.statusText(gtx))
-	l.Color = statusFg
+	l.Color = col.statusFg
 	l.MaxLines = 1
 	return l.Layout(gtx)
 }
@@ -64,8 +64,8 @@ func (a *App) statusText(gtx layout.Context) string {
 }
 
 func (a *App) caretInfo(gtx layout.Context) layout.Dimensions {
-	row, col := a.editor.CaretPos()
-	l := material.Caption(a.th, fmt.Sprintf("Ln %d, Col %d · %d words", row+1, col+1, a.words))
-	l.Color = statusFg
+	row, column := a.editor.CaretPos()
+	l := material.Caption(a.th, fmt.Sprintf("Ln %d, Col %d · %d words", row+1, column+1, a.words))
+	l.Color = col.statusFg
 	return l.Layout(gtx)
 }

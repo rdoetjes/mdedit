@@ -112,9 +112,14 @@ type Span struct {
     Bold, Italic, Mono, Strike, Underline bool
     Math, Display bool  // Text holds TeX source
     Link  string
-    Color color.NRGBA   // syntax highlighting
+    Highlighted bool              // syntax-highlighted code …
+    Token       chroma.TokenType  // … and its token type (keyword, string …)
 }
 ```
+
+Highlighted spans carry the *kind* of token, not a colour: the renderer
+picks the colour from its theme (`render/inline.go: applyCodeStyle`), so one
+parse serves both the light and the dark preview.
 
 ### `render.Layout` and `render.Prim` — what to draw where (render/render.go)
 
@@ -319,7 +324,8 @@ The PDF export takes the same path from step 7 on, with
 | `findbar.go`, `findbar_view.go` | Search/replace logic and view, match highlighting |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
-| `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed`, colours |
+| `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed` |
+| `colors.go`, `theme.go` | The window's colours (`uiColors`: `lightColors`, `darkColors`, the current one in `col`); switching theme (`setDark`); `settings.json` |
 
 **Gio style used throughout:** no closures. A piece of UI is a named method
 with the `layout.Widget` signature, and repeated rows are small types with a
@@ -345,6 +351,25 @@ func (b toolbarButton) layout(gtx layout.Context) layout.Dimensions {
 callbacks: `files.go` records the pending `action` in `App.flow`, and the
 dialogs report back to named methods such as `discardAnswered`,
 `saveAsChosen`, `overwriteAnswered`.
+
+**Themes** have three parts, and `theme.go: setDark` switches all three at
+once:
+
+1. `col` (`colors.go`) — the window chrome: toolbar, menus, dialogs, find
+   bar, match highlights. UI code always writes `col.toolbarBg`, never a
+   literal colour.
+2. `a.th.Palette` — Gio's `material` palette, which colours text, editors,
+   check boxes and scroll bars.
+3. `Preview.SetTheme(&render.Light / &render.Dark)` — the preview's
+   `render.Theme` (text, links, borders, code backgrounds and the chroma
+   style for code); it clears the layout cache so every block is laid out
+   again in the new colours.
+
+At start-up `startDark` uses the saved choice in
+`<UserConfigDir>/mdedit/settings.json`, or else asks the system
+(`gioui.org/x/pref/theme`, which only knows on macOS and Windows).
+`cmdToggleTheme` (View → Dark Theme, Ctrl+Shift+D) flips it and saves it.
+The PDF exporter always uses `render.Light`.
 
 ### 6.2 `internal/edit` — editing commands as pure functions
 
@@ -386,7 +411,7 @@ func SetHeading(s State, level int) State {
 | `inline.go` | Inline spans: `inlineRun.node` dispatcher, raw inline HTML (`<u>`, `<br>`), task boxes |
 | `html.go` | HTML blocks, the `<div align="…">` wrapper |
 | `math.go` | goldmark extension for `$$…$$` blocks and `$…$` inline maths |
-| `highlight.go` | Syntax highlighting with chroma, language aliases |
+| `highlight.go` | Syntax highlighting with chroma (token types only, no colours), language aliases |
 
 The block dispatcher is the place new block types start:
 
@@ -418,7 +443,7 @@ and any active alignment.
 
 | File | What's in it |
 |---|---|
-| `render.go` | `Ctx`, `Prim`, `Layout`, `Theme`, list markers, paragraph/heading/code layouts, maths block, `mathPrims` |
+| `render.go` | `Ctx`, `Prim`, `Layout`, `Theme` (`Light`, `Dark`), list markers, paragraph/heading/code layouts, maths block, `mathPrims` |
 | `block.go` | `Ctx.Block` — containers (`frame`), the `content` dispatcher, offsets, quote bars |
 | `inline.go` | Inline layout: `lineBreaker` (word wrapping, inline maths boxes) and `lineEmitter` (runs → prims: text, code background, underline, strike, links) |
 | `table.go` | `tableLayout`: column widths, rows, grid lines |
@@ -574,6 +599,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 | Maths: wrong symbol or "red" command | `tex/symbols.go`, `tex/commands.go: init` |
 | A key does nothing, or does the wrong thing | Who takes it first: `ui/window.go: handleInput` order, `ui/keys.go`; is a dialog or the find bar focused? Is the shortcut in `commands.go`? |
 | A click does nothing | Was the clickable laid out last frame? Is an overlay (dialog, popup dismiss area, `blockPointer`) on top of it? |
+| A colour wrong in one theme only | Window chrome: `ui/colors.go`; Gio widgets: the palettes in `ui/theme.go`; preview: `render.Light` / `render.Dark`; code tokens: the chroma style named in `Theme.CodeStyle` |
 | Preview doesn't update | `ui/app.go: reparse` → `Preview.SetDocument`; the cache reset in `ui/preview.go: measure` |
 | Preview doesn't scroll with the caret | `ui/panes.go: followCaret`, `Block.Line` from `mdmodel/parse.go: emit` |
 | Images / YouTube stills missing | `render/images.go: ResolveImage`, `ui/images.go`, `internal/imgcache` (cache in `~/.cache/mdedit/images`, `~/Library/Caches/mdedit/images` on macOS) |
@@ -586,7 +612,8 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 - **Export a PDF without the UI:** `./bin/mdedit -pdf file.md -o out.pdf`.
 - **Screenshots without a display:** `MDEDIT_SHOT=/tmp/shots go test
   ./internal/ui -run TestScreenshot` renders the real window offscreen
-  (split view, menus, dialogs, find bar, maths, videos …) to PNG files.
+  (split view, menus, dialogs, find bar, maths, videos …, and the same in
+  the dark theme as `dark-*.png`) to PNG files.
   Add a scene in `ui/screenshot_test.go` when you add something visual.
 - **The UI test harness** (`ui/harness_test.go`) drives the real `App`
   through Gio's input router: `h.press(key, mods)`, `h.rightClick(x, y)`,
@@ -615,6 +642,13 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   source text.
 - **Focus:** Ctrl/⌘+Z undoes in whichever editor has the focus — the main
   editor or a field of the find bar or a dialog.
+- **Theme in tests:** `ui/main_test.go: TestMain` points `configDir` at a
+  temporary directory with the light theme saved, so tests don't depend on
+  the machine's dark mode or touch your real settings.
+- **Keys after a menu in tests:** Gio delivers keys only to filters
+  registered in the *previous* frame, and shortcuts aren't polled while a
+  menu is open. In the harness, call `h.frame()` after closing a menu
+  before pressing a shortcut.
 - **macOS builds** need `CC=clang` (the Makefile sets it); a Homebrew GCC
   can't compile Gio's Objective-C.
 

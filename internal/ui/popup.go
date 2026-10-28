@@ -2,7 +2,6 @@ package ui
 
 import (
 	"image"
-	"image/color"
 
 	"gioui.org/gesture"
 	"gioui.org/io/key"
@@ -23,8 +22,6 @@ type popup struct {
 	dismiss gesture.Click
 	width   int
 }
-
-var popupShadow = color.NRGBA{A: 0x22}
 
 // Layout draws the items with the top-left corner at `at`, moved if needed
 // to stay inside the window. A click outside the popup (except in
@@ -131,9 +128,9 @@ func drawPopupFrame(gtx layout.Context, size image.Point) {
 	r := gtx.Dp(6)
 	box := image.Rectangle{Max: size}
 	shadow := box.Add(image.Pt(0, gtx.Dp(2))).Inset(-gtx.Dp(1))
-	fillRoundRect(gtx, popupShadow, shadow, r)
-	fillRoundRect(gtx, white, box, r)
-	paint.FillShape(gtx.Ops, dividerCol, clip.Stroke{Path: clip.UniformRRect(box, r).Path(gtx.Ops), Width: 1}.Op())
+	fillRoundRect(gtx, col.popupShadow, shadow, r)
+	fillRoundRect(gtx, col.cardBg, box, r)
+	paint.FillShape(gtx.Ops, col.dividerCol, clip.Stroke{Path: clip.UniformRRect(box, r).Path(gtx.Ops), Width: 1}.Op())
 	area := clip.Rect(box).Push(gtx.Ops)
 	blockPointer(gtx)
 	area.Pop()
@@ -162,7 +159,7 @@ func (r popupRow) layout(gtx layout.Context) layout.Dimensions {
 
 func (r popupRow) separator(gtx layout.Context) layout.Dimensions {
 	h := gtx.Dp(9)
-	fillRect(gtx, dividerCol, image.Rect(0, h/2, r.p.width, h/2+1))
+	fillRect(gtx, col.dividerCol, image.Rect(0, h/2, r.p.width, h/2+1))
 	return layout.Dimensions{Size: image.Pt(r.p.width, h)}
 }
 
@@ -174,7 +171,7 @@ func (r popupRow) item(gtx layout.Context) layout.Dimensions {
 
 func (r popupRow) background(gtx layout.Context) layout.Dimensions {
 	if r.p.clicks[r.i].Hovered() {
-		fillRect(gtx, menuHover, image.Rectangle{Max: gtx.Constraints.Min})
+		fillRect(gtx, col.menuHover, image.Rectangle{Max: gtx.Constraints.Min})
 	}
 	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
@@ -202,18 +199,18 @@ func (r popupRow) icon(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{Size: size}
 	}
 	gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(18), gtx.Dp(18)))
-	ic.Layout(gtx, statusFg)
+	ic.Layout(gtx, col.statusFg)
 	return layout.Dimensions{Size: size}
 }
 
 func (r popupRow) label(gtx layout.Context) layout.Dimensions {
 	l := material.Body2(r.p.th, r.p.items[r.i].label)
-	l.Color = buttonFg
+	l.Color = col.buttonFg
 	return l.Layout(gtx)
 }
 
 func (r popupRow) shortcut(gtx layout.Context) layout.Dimensions {
 	l := material.Body2(r.p.th, r.p.items[r.i].shortcut())
-	l.Color = statusFg
+	l.Color = col.statusFg
 	return l.Layout(gtx)
 }

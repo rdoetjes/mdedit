@@ -84,6 +84,7 @@ type commands struct {
 	insertTOC, updateTOC     *command
 	find, replace            *command
 	video                    *command
+	theme                    *command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -120,6 +121,7 @@ func (a *App) buildSharedCommands() {
 	c.insertTOC = a.editCommand("Table of Contents", "", 0, edit.InsertTOC)
 	c.updateTOC = newCommand("Update Table of Contents", "", 0, a.cmdUpdateTOC)
 	c.video = newCommand("YouTube Video…", "", 0, a.cmdVideo)
+	c.theme = newCommand("Dark Theme", "D", key.ModShift, a.cmdToggleTheme)
 	c.find = newCommand("Find…", "F", 0, a.cmdFind)
 	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
@@ -214,6 +216,8 @@ func (a *App) viewMenu() *menu {
 		newCommand("Editor and Preview", "", 0, viewChoice{a, viewSplit}.run),
 		newCommand("Editor Only", "", 0, viewChoice{a, viewEditor}.run),
 		newCommand("Preview Only", "", 0, viewChoice{a, viewPreview}.run),
+		nil,
+		a.cmds.theme,
 		nil,
 		newCommand("Cycle Views", "/", 0, a.cmdCycleView),
 	}}

@@ -57,6 +57,16 @@ numbered/bullet lists and table. Main shortcuts (⌘ instead of Ctrl on macOS):
 | Ctrl+/                 | Cycle split/editor/preview | Ctrl+T           | Insert table     |
 | Ctrl+Q                 | Quit                      | Ctrl+K / Ctrl+Shift+K | Link / code block |
 | Ctrl+F / Ctrl+R        | Find / Replace            | Ctrl+G / Ctrl+Shift+G | Next / previous match |
+| Ctrl+Shift+D           | Dark / light theme        |                   |                  |
+
+View → Dark Theme (Ctrl+Shift+D) switches the whole window — menus,
+dialogs, editor and preview, including code highlighting — to a dark theme
+modelled on GitHub's; the menu item then reads Light Theme. The choice is
+saved in `settings.json` in the user's config directory
+(`~/.config/mdedit/` on Linux and FreeBSD, `~/Library/Application
+Support/mdedit/` on macOS). Until a choice is saved, mdedit follows the
+system's dark mode where it can detect it (macOS, Windows) and starts light
+elsewhere. Exported PDFs are always light, since they are meant for paper.
 
 Find (Ctrl+F) and Replace (Ctrl+R) open a bar above the editor; the
 selected text becomes the search text. All matches are highlighted, the

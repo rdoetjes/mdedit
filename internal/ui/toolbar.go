@@ -17,8 +17,8 @@ func (a *App) toolbar(gtx layout.Context) layout.Dimensions {
 
 func barWithBottomLine(gtx layout.Context) layout.Dimensions {
 	sz := gtx.Constraints.Min
-	fillRect(gtx, toolbarBg, image.Rectangle{Max: sz})
-	fillRect(gtx, dividerCol, image.Rect(0, sz.Y-1, sz.X, sz.Y))
+	fillRect(gtx, col.toolbarBg, image.Rectangle{Max: sz})
+	fillRect(gtx, col.dividerCol, image.Rect(0, sz.Y-1, sz.X, sz.Y))
 	return layout.Dimensions{Size: sz}
 }
 
@@ -42,7 +42,7 @@ func (a *App) toolbarItems(gtx layout.Context) layout.Dimensions {
 
 func toolbarSeparator(gtx layout.Context) layout.Dimensions {
 	w, h := gtx.Dp(17), gtx.Dp(30)
-	fillRect(gtx, dividerCol, image.Rect(w/2, gtx.Dp(5), w/2+1, h-gtx.Dp(5)))
+	fillRect(gtx, col.dividerCol, image.Rect(w/2, gtx.Dp(5), w/2+1, h-gtx.Dp(5)))
 	return layout.Dimensions{Size: image.Pt(w, h)}
 }
 
@@ -56,7 +56,7 @@ func (a *App) fileName(gtx layout.Context) layout.Dimensions {
 		name += "  •"
 	}
 	l := material.Body2(a.th, name)
-	l.Color = statusFg
+	l.Color = col.statusFg
 	l.MaxLines = 1
 	l.Alignment = text.End
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
@@ -93,7 +93,7 @@ func (b iconButton) body(gtx layout.Context) layout.Dimensions {
 
 func (b iconButton) background(gtx layout.Context) layout.Dimensions {
 	if b.click.Hovered() {
-		fillRoundRect(gtx, menuOpen, image.Rectangle{Max: gtx.Constraints.Min}, gtx.Dp(4))
+		fillRoundRect(gtx, col.menuOpen, image.Rectangle{Max: gtx.Constraints.Min}, gtx.Dp(4))
 	}
 	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
@@ -105,5 +105,5 @@ func (b iconButton) padded(gtx layout.Context) layout.Dimensions {
 func (b iconButton) glyph(gtx layout.Context) layout.Dimensions {
 	sz := gtx.Dp(unit.Dp(20))
 	gtx.Constraints = layout.Exact(image.Pt(sz, sz))
-	return b.icon.Layout(gtx, buttonFg)
+	return b.icon.Layout(gtx, col.buttonFg)
 }

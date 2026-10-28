@@ -124,7 +124,7 @@ func (d *TableDialog) errorLine(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{}
 	}
 	l := material.Body2(d.th, d.err)
-	l.Color = errorColor
+	l.Color = col.errorColor
 	return layout.Inset{Bottom: 10}.Layout(gtx, l.Layout)
 }
 

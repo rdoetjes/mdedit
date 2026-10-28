@@ -9,11 +9,6 @@ import (
 	"gioui.org/widget/material"
 )
 
-var (
-	matchBg   = color.NRGBA{R: 0xff, G: 0xd3, B: 0x3d, A: 0x66}
-	currentBg = color.NRGBA{R: 0xff, G: 0x96, B: 0x1f, A: 0x88}
-)
-
 // layout draws the bar: the search row, and the replace row if shown.
 func (f *findBar) layout(gtx layout.Context) layout.Dimensions {
 	f.update()
@@ -61,7 +56,7 @@ func (f *findBar) replaceRow(gtx layout.Context) layout.Dimensions {
 func (f *findBar) count(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Dp(80)
 	l := material.Caption(f.th, f.counter())
-	l.Color = statusFg
+	l.Color = col.statusFg
 	return l.Layout(gtx)
 }
 
@@ -78,11 +73,11 @@ func (f *findBar) highlight(gtx layout.Context) {
 	n := len([]rune(f.key.q.Text))
 	from, to := f.nearCaret()
 	for i := from; i < to; i++ {
-		col := matchBg
+		bg := col.matchBg
 		if i == f.current {
-			col = currentBg
+			bg = col.currentBg
 		}
-		f.highlightRange(gtx, f.matches[i], f.matches[i]+n, col)
+		f.highlightRange(gtx, f.matches[i], f.matches[i]+n, bg)
 	}
 }
 
@@ -95,10 +90,10 @@ func (f *findBar) nearCaret() (int, int) {
 	return from, min(from+maxHighlights, len(f.matches))
 }
 
-func (f *findBar) highlightRange(gtx layout.Context, start, end int, col color.NRGBA) {
+func (f *findBar) highlightRange(gtx layout.Context, start, end int, bg color.NRGBA) {
 	f.a.regions = f.a.editor.Regions(start, end, f.a.regions[:0])
 	for _, r := range f.a.regions {
-		fillRect(gtx, col, r.Bounds)
+		fillRect(gtx, bg, r.Bounds)
 	}
 }
 

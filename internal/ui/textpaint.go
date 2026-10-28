@@ -90,7 +90,7 @@ func metricsOf(gs []text.Glyph) render.Metrics {
 	}
 }
 
-func (t *textPainter) draw(gtx layout.Context, f render.FontSpec, size float32, s string, x, baseline float32, col color.NRGBA) {
+func (t *textPainter) draw(gtx layout.Context, f render.FontSpec, size float32, s string, x, baseline float32, c color.NRGBA) {
 	gs := t.shape(f, size, s)
 	if len(gs) == 0 {
 		return
@@ -99,7 +99,7 @@ func (t *textPainter) draw(gtx layout.Context, f render.FontSpec, size float32, 
 	// Shape draws relative to the first glyph's origin on the baseline.
 	st := op.Offset(image.Pt(rnd(x)+gs[0].X.Floor(), rnd(baseline))).Push(ops)
 	outline := clip.Outline{Path: t.shaper.Shape(gs)}.Op().Push(ops)
-	paint.ColorOp{Color: col}.Add(ops)
+	paint.ColorOp{Color: c}.Add(ops)
 	paint.PaintOp{}.Add(ops)
 	outline.Pop()
 	if call := t.shaper.Bitmaps(gs); call != (op.CallOp{}) {

@@ -7,7 +7,7 @@
 // makes page breaking in the PDF exporter straightforward.
 package mdmodel
 
-import "image/color"
+import "github.com/alecthomas/chroma/v2"
 
 // Span is a run of inline text with uniform styling.
 type Span struct {
@@ -20,13 +20,17 @@ type Span struct {
 	// Math spans hold TeX source in Text; Display selects display style.
 	Math    bool
 	Display bool
-	Link    string      // link target; empty if not a link
-	Color   color.NRGBA // syntax-highlight colour; zero means the default colour
+	Link    string // link target; empty if not a link
+	// Highlighted code carries its token type; the renderer picks the
+	// colour for its theme.
+	Highlighted bool
+	Token       chroma.TokenType
 }
 
 func (s Span) sameStyle(o Span) bool {
 	return !s.Math && !o.Math && s.Bold == o.Bold && s.Italic == o.Italic && s.Mono == o.Mono &&
-		s.Strike == o.Strike && s.Underline == o.Underline && s.Link == o.Link && s.Color == o.Color
+		s.Strike == o.Strike && s.Underline == o.Underline && s.Link == o.Link &&
+		s.Highlighted == o.Highlighted && s.Token == o.Token
 }
 
 type Kind int
