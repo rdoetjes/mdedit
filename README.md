@@ -176,3 +176,7 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     tools/mkicon       draws the application icon
 
 The preview and the PDF share `internal/render`, so both use the same layout.
+
+See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for how the layers fit together, how
+input flows through the code, where to add features and where to look for
+bugs.
