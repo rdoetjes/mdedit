@@ -35,11 +35,14 @@ pidfile="${rundir}/${name}.pid"
 logfile="/var/log/${name}.log"
 procname="/usr/local/bin/mdedit-web"
 command="/usr/sbin/daemon"
-command_args="-f -p ${pidfile} -o ${logfile} -u ${mdedit_web_user} ${procname} -addr ${mdedit_web_addr} -dir ${mdedit_web_dir} ${mdedit_web_flags}"
+# rc.subr runs the command as ${name}_user (mdedit_web_user) itself, with
+# su(1); daemon(8) must not switch user again (-u), which only root can do.
+command_args="-f -p ${pidfile} -o ${logfile} ${procname} -addr ${mdedit_web_addr} -dir ${mdedit_web_dir} ${mdedit_web_flags}"
 
 start_precmd="${name}_prestart"
 
-# The pid and log files must be writable by the server's user.
+# Runs as root, before the switch to mdedit_web_user: the pid and log
+# files must be writable by that user.
 mdedit_web_prestart()
 {
 	install -d -o "${mdedit_web_user}" -m 755 "${rundir}"

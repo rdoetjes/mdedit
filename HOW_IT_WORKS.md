@@ -1641,7 +1641,12 @@ script) into the jail, enables the service with `sysrc -R <jail root>`,
 and restarts it with `jexec` if `jls` shows the jail running. The rc.d
 script runs the server under `daemon(8)` as user `www`, with its pid file
 in `/var/run/mdedit_web/` and its log in `/var/log/mdedit_web.log`, both
-created for that user before start (`mdedit_web_prestart`).
+created for that user before start (`mdedit_web_prestart`). The switch to
+`www` is done by rc.subr, because the setting is called `mdedit_web_user`
+(rc.subr's `${name}_user` convention: it runs the command with `su`).
+`daemon` must therefore not get `-u` as well: it would already be running
+as `www`, and only root may change user — the symptom is
+`initgroups(www,80): Operation not permitted` in `/var/log/messages`.
 
 Behind a reverse proxy that does HTTPS (`assets/caddy/Caddyfile` for
 Caddy), the proxy passes the compressed responses through unchanged; it
