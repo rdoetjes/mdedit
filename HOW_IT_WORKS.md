@@ -61,7 +61,7 @@ That is why the preview and the PDF can't drift apart.
 | `internal/imgcache` | Downloads YouTube stills into an on-disk cache (async for the preview, sync for PDF) | youtube |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
 | `internal/lint` | A test enforcing the code style (see §9) | — |
-| `tools/mkicon` | Draws the application icon PNGs | x/image/vector |
+| `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 
 Rule of thumb: **lower layers never import higher ones.** If you find
 yourself wanting `render` to import `ui`, the code belongs somewhere else.
@@ -205,6 +205,11 @@ Two rules follow from this, and most input bugs come from forgetting one:
    `clickable.Layout(…)` both draws a button and marks its area clickable;
    `event.Op` / `gesture.Click.Add` do the same for custom areas. Something
    not drawn this frame can't be clicked next frame.
+
+Files the operating system asks to open (the macOS Finder's "Open With",
+or a file dropped on the Dock icon) arrive in `cmd/mdedit/main.go: opener`
+on the main goroutine and are handed over with `ui/app.go: RequestOpen`;
+`ui/window.go: handleOpenRequest` opens them on the next frame.
 
 Anything that must happen *later* (after a dialog closes, after a download
 finishes) is stored in a field and done on the next frame: see

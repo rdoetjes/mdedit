@@ -79,3 +79,26 @@ func TestFileDialogEnterSmallerFolder(t *testing.T) {
 		t.Errorf("picked %q", rec.path)
 	}
 }
+
+// The Finder's "Open With" arrives as an open request from another
+// goroutine; the file opens on the next frame.
+func TestOpenRequest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "doc.md")
+	if err := os.WriteFile(path, []byte("# From Finder\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, "")
+	done := make(chan bool)
+	go requestOpen(h.a, path, done)
+	<-done
+	h.frame()
+	h.expect("# From Finder\n")
+	if h.a.path != path {
+		t.Errorf("path %q, want %q", h.a.path, path)
+	}
+}
+
+func requestOpen(a *App, path string, done chan bool) {
+	a.RequestOpen(path)
+	done <- true
+}

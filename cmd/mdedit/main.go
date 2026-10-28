@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gioui.org/app"
+	"gioui.org/io/event"
 	"gioui.org/unit"
 
 	"mdedit/internal/mdmodel"
@@ -41,7 +42,7 @@ func main() {
 		editor, err := ui.New(flag.Arg(0))
 		check(err)
 		go runWindow(editor)
-		app.Main()
+		app.Events(opener{editor}.handle)
 	}
 }
 
@@ -64,6 +65,17 @@ func runWindow(editor *ui.App) {
 	w.Option(app.Title("mdedit"), app.Size(unit.Dp(1280), unit.Dp(820)), app.MinSize(unit.Dp(480), unit.Dp(320)))
 	check(editor.Run(w))
 	os.Exit(0)
+}
+
+// opener passes files the operating system asks to open (the macOS
+// Finder's "Open With", or dropping a file on the Dock icon) to the editor.
+type opener struct{ editor *ui.App }
+
+func (o opener) handle(e event.Event) bool {
+	if u, ok := e.(app.URLEvent); ok && u.URL.Scheme == "file" {
+		o.editor.RequestOpen(u.URL.Path)
+	}
+	return true
 }
 
 func exportPDF(in, out string) error {

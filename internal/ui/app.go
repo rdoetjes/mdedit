@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -73,6 +74,11 @@ type App struct {
 
 	dialog dialog
 	flow   flow
+	// openRequest is a file the operating system asked to open (Finder's
+	// "Open With"); it arrives on another goroutine.
+	openMu      sync.Mutex
+	openRequest string
+
 	// pendingEdit and pendingCmd run on the next frame; they are requested
 	// by dialogs, which have no layout context.
 	pendingEdit editFunc
@@ -237,13 +243,39 @@ func (a *App) invalidate() {
 	}
 }
 
-// dir is the folder of the document, or the working directory.
+// dir is the folder of the document, or else the working directory —
+// unless that is the root, as for apps started from the Finder, in which
+// case it is the home folder.
 func (a *App) dir() string {
 	if a.path != "" {
 		return filepath.Dir(a.path)
 	}
-	d, _ := os.Getwd()
+	d, err := os.Getwd()
+	if err != nil || d == "/" {
+		if home, herr := os.UserHomeDir(); herr == nil {
+			return home
+		}
+	}
 	return d
+}
+
+// RequestOpen asks the editor to open a file, as the Finder does for "Open
+// With". It is safe to call from any goroutine; the file is opened on the
+// next frame, after asking about unsaved changes.
+func (a *App) RequestOpen(path string) {
+	a.openMu.Lock()
+	a.openRequest = path
+	a.openMu.Unlock()
+	a.invalidate()
+}
+
+// takeOpenRequest returns and clears a pending open request.
+func (a *App) takeOpenRequest() string {
+	a.openMu.Lock()
+	defer a.openMu.Unlock()
+	p := a.openRequest
+	a.openRequest = ""
+	return p
 }
 
 func (a *App) baseName() string {

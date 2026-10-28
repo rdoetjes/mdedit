@@ -52,6 +52,7 @@ func (a *App) handleInput(gtx layout.Context) {
 	a.handleToolbar(gtx)
 	a.find.handleInput(gtx)
 	a.runPending(gtx)
+	a.handleOpenRequest()
 }
 
 func (a *App) handleToolbar(gtx layout.Context) {
@@ -70,6 +71,14 @@ func (a *App) runPending(gtx layout.Context) {
 	if c := a.pendingCmd; c != nil {
 		a.pendingCmd = nil
 		c.run(gtx)
+	}
+}
+
+// handleOpenRequest opens a file the operating system asked to open.
+func (a *App) handleOpenRequest() {
+	if p := a.takeOpenRequest(); p != "" {
+		a.flow.linkPath = p
+		a.confirmDiscard(actOpenFile)
 	}
 }
 

@@ -10,6 +10,7 @@
 #   make desktop    write bin/mdedit.desktop (menu entry, Exec=$(PREFIX)/bin/mdedit)
 #   make install-desktop   install the menu entry and icons under $(PREFIX)/share
 #   make icons      redraw the PNG icons in assets/icons
+#   make macos      build bin/MDEdit.app (macOS only); drag it into Applications
 #   make deps       show the system packages needed to build
 #
 # Gio, the UI toolkit, uses cgo on Linux, the BSDs and macOS. All Go code is
@@ -26,7 +27,7 @@ TAGS    ?=
 
 LDFLAGS = -s -w -X main.version=$(VERSION)
 
-.PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons
+.PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos
 
 all: build
 
@@ -95,6 +96,23 @@ uninstall-desktop:
 
 icons:
 	$(GO) run ./tools/mkicon assets/icons
+
+# macOS application bundle.
+APP       = bin/MDEdit.app
+BUNDLE_ID ?= org.mdedit.MDEdit
+
+macos: build
+	@if [ "$$(uname -s)" != Darwin ]; then echo "make macos needs macOS (iconutil, codesign)"; exit 1; fi
+	rm -rf $(APP) bin/mdedit.iconset
+	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
+	cp $(BIN) $(APP)/Contents/MacOS/mdedit
+	sed -e 's/@VERSION@/$(VERSION)/g' -e 's/@BUNDLE_ID@/$(BUNDLE_ID)/g' assets/macos/Info.plist > $(APP)/Contents/Info.plist
+	printf 'APPL????' > $(APP)/Contents/PkgInfo
+	$(GO) run ./tools/mkicon -macos bin/mdedit.iconset
+	iconutil -c icns -o $(APP)/Contents/Resources/mdedit.icns bin/mdedit.iconset
+	rm -rf bin/mdedit.iconset
+	codesign --force --sign - $(APP)
+	@echo "Built $(APP): drag it into /Applications"
 
 deps:
 	@echo "Build requirements: Go >= 1.25, a C compiler and pkg-config, plus:"

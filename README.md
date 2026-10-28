@@ -30,6 +30,12 @@ all standard sizes under `share/icons/hicolor`. `make desktop` only writes
 `bin/mdedit.desktop`; `make icons` redraws the icons from `tools/mkicon`.
 For a per-user install without root, `make-desktop.sh` is still there.
 
+On macOS, `make macos` builds `bin/MDEdit.app` with its icon; drag it into
+Applications. Markdown files then offer MDEdit under the Finder's "Open
+With" (it doesn't make itself the default app), and you can drop a file on
+its Dock icon. The app is signed ad hoc, which is all a locally built app
+needs; to give it to someone else it would need a Developer ID signature.
+
 On FreeBSD both `make` and `gmake` work. The result is a single executable
 containing all Go code and fonts; it only loads the system's windowing and
 GPU libraries at run time.
