@@ -76,6 +76,7 @@ func (a *App) runPending(gtx layout.Context) {
 
 // handleOpenRequest opens a file the operating system asked to open.
 func (a *App) handleOpenRequest() {
+	a.handleArrivals()
 	if p := a.takeOpenRequest(); p != "" {
 		a.flow.linkPath = p
 		a.confirmDiscard(actOpenFile)

@@ -2,8 +2,6 @@ package ui
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 
 	"gioui.org/layout"
 	"gioui.org/widget/material"
@@ -17,37 +15,20 @@ type settings struct {
 	Theme string `json:"theme,omitempty"` // "light" or "dark"; empty follows the system
 }
 
-// configDir is where settings.json lives; tests point it elsewhere.
-var configDir = defaultConfigDir()
-
-func defaultConfigDir() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "mdedit")
-}
-
 func loadSettings() settings {
 	var s settings
-	if data, err := os.ReadFile(filepath.Join(configDir, "settings.json")); err == nil {
+	if data, err := readSettings(); err == nil {
 		json.Unmarshal(data, &s) // a broken file just means defaults
 	}
 	return s
 }
 
 func (s settings) save() error {
-	if configDir == "" {
-		return os.ErrNotExist
-	}
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(configDir, "settings.json"), data, 0o644)
+	return writeSettings(data)
 }
 
 // startDark decides the theme at start-up: the saved choice, or else the
@@ -89,7 +70,7 @@ func themeName(dark bool) string {
 // Gio's own palette colours text, text fields, check boxes and scroll bars.
 var (
 	lightPalette = material.NewTheme().Palette // Gio's defaults, as before themes existed
-	darkPalette = material.Palette{Fg: rgba(0xe6edf3, 0xff), Bg: rgba(0x0d1117, 0xff),
+	darkPalette  = material.Palette{Fg: rgba(0xe6edf3, 0xff), Bg: rgba(0x0d1117, 0xff),
 		ContrastBg: rgba(0x4493f8, 0xff), ContrastFg: rgba(0xffffff, 0xff)}
 )
 

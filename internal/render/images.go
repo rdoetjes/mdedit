@@ -6,12 +6,13 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"net/url"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"mdedit/internal/imgcache"
+	"mdedit/internal/vfs"
 )
 
 // ResolveImage maps an image reference from a document in baseDir to a local
@@ -43,17 +44,17 @@ var (
 
 // ImageFileSize returns the pixel size of a PNG, JPEG or GIF file.
 func ImageFileSize(path string) (w, h int, ok bool) {
-	st, err := os.Stat(path)
+	mod, err := vfs.ModTime(path)
 	if err != nil {
 		return 0, 0, false
 	}
-	key := path + "\x00" + st.ModTime().String()
+	key := path + "\x00" + strconv.FormatInt(mod, 10)
 	sizeMu.Lock()
 	defer sizeMu.Unlock()
 	if v, hit := sizeCache[key]; hit {
 		return v[0], v[1], v[2] == 1
 	}
-	f, err := os.Open(path)
+	f, err := vfs.Open(path)
 	if err != nil {
 		return 0, 0, false
 	}

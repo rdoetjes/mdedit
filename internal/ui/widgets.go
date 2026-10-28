@@ -4,8 +4,6 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"os/exec"
-	"runtime"
 
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -132,24 +130,4 @@ func blockFilter() pointer.Filter {
 		ScrollX: pointer.ScrollRange{Min: math.MinInt32, Max: math.MaxInt32},
 		ScrollY: pointer.ScrollRange{Min: math.MinInt32, Max: math.MaxInt32},
 	}
-}
-
-// openURL opens a URL with the system's default handler.
-func openURL(url string) error {
-	cmd := openCommand(url)
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go cmd.Wait()
-	return nil
-}
-
-func openCommand(url string) *exec.Cmd {
-	switch runtime.GOOS {
-	case "darwin":
-		return exec.Command("open", url)
-	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	}
-	return exec.Command("xdg-open", url) // Linux, the BSDs
 }

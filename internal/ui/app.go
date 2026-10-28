@@ -84,6 +84,8 @@ type App struct {
 	// by dialogs, which have no layout context.
 	pendingEdit editFunc
 	pendingCmd  *command
+
+	platform platformState // desktop or browser specifics (platform_*.go)
 }
 
 // Version is shown in the About box.
@@ -92,7 +94,7 @@ var Version = "dev"
 // New creates the editor, loading path if it is non-empty. A path that does
 // not exist yet becomes the save destination of a new document.
 func New(path string) (*App, error) {
-	shaper := text.NewShaper(text.WithCollection(gofont.Collection()))
+	shaper := text.NewShaper(text.WithCollection(append(gofont.Collection(), platformFonts()...)))
 	th := material.NewTheme()
 	th.Shaper = shaper
 	th.TextSize = 15
@@ -109,28 +111,6 @@ func New(path string) (*App, error) {
 		return nil, err
 	}
 	return a, nil
-}
-
-func (a *App) loadInitial(path string) error {
-	if path == "" {
-		a.load("", "")
-		return nil
-	}
-	if abs, err := filepath.Abs(path); err == nil {
-		path = abs
-	}
-	data, err := os.ReadFile(path)
-	switch {
-	case err == nil:
-		a.load(path, string(data))
-	case os.IsNotExist(err):
-		a.load("", "")
-		a.path = path
-		a.preview.BaseDir = filepath.Dir(path)
-	default:
-		return err
-	}
-	return nil
 }
 
 func (a *App) load(path, content string) {
@@ -156,6 +136,7 @@ func (a *App) reparse() {
 	a.preview.SetDocument(a.doc)
 	a.dirty = txt != a.saved
 	a.words = countWords(txt)
+	a.autosave()
 }
 
 func countWords(s string) int {
@@ -191,36 +172,6 @@ func (a *App) Run(w *app.Window) error {
 			e.Frame(gtx.Ops)
 		}
 	}
-}
-
-// saveRecovery keeps unsaved work when the window is closed with changes.
-func (a *App) saveRecovery() {
-	if !a.dirty {
-		return
-	}
-	p, err := a.recoveryPath()
-	if err == nil {
-		err = os.WriteFile(p, []byte(a.editor.Text()), 0o600)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "mdedit: could not save unsaved changes:", err)
-		return
-	}
-	fmt.Fprintln(os.Stderr, "mdedit: unsaved changes written to", p)
-}
-
-// recoveryPath returns a new file name in the user's cache folder.
-func (a *App) recoveryPath() (string, error) {
-	dir, err := os.UserCacheDir()
-	if err != nil {
-		dir = os.TempDir()
-	}
-	dir = filepath.Join(dir, "mdedit")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-	stamp := time.Now().Format("20060102-150405")
-	return filepath.Join(dir, fmt.Sprintf("%s-%s.md", a.baseName(), stamp)), nil
 }
 
 func (a *App) updateTitle() {

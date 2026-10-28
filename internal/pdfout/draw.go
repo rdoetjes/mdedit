@@ -7,6 +7,7 @@ import (
 	"github.com/go-pdf/fpdf"
 
 	"mdedit/internal/render"
+	"mdedit/internal/vfs"
 )
 
 // draw paints the primitives of l that fall in seg.
@@ -120,11 +121,27 @@ func (e *exporter) drawImage(p *render.Prim, seg segment) {
 		return
 	}
 	path, ok := render.ResolveImage(e.base, p.URL)
-	if !ok {
+	if !ok || !e.registerImage(path) {
 		return
 	}
 	e.pdf.ImageOptions(path, float64(e.left+p.X), float64(p.Y+seg.dy), float64(p.W), float64(p.H),
 		false, fpdf.ImageOptions{ImageType: imageType(path)}, 0, "")
+}
+
+// registerImage embeds an image file in the PDF, once. It is read through
+// package vfs, so downloaded stills work in the browser too, where they are
+// kept in memory.
+func (e *exporter) registerImage(path string) bool {
+	if e.pdf.GetImageInfo(path) != nil {
+		return true
+	}
+	f, err := vfs.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	e.pdf.RegisterImageOptionsReader(path, fpdf.ImageOptions{ImageType: imageType(path)}, f)
+	return e.pdf.Ok()
 }
 
 // drawLink adds a link area: to a heading for "#anchor", else to a URL.

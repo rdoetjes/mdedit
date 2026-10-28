@@ -12,6 +12,11 @@
 #   make icons      redraw the PNG icons in assets/icons
 #   make macos      build bin/MDEdit.app (macOS only); drag it into Applications
 #   make deps       show the system packages needed to build
+#   make wasm       build the browser version into bin/web, plus its web
+#                   server bin/mdedit-web
+#   make serve      run bin/mdedit-web on http://localhost:8080
+#   make install-jail   (sudo; FreeBSD) install the browser version and its
+#                   service into the jail at $(JAIL_ROOT)
 #
 # Gio, the UI toolkit, uses cgo on Linux, the BSDs and macOS. All Go code is
 # linked into one self-contained binary; only the system's windowing and GPU
@@ -27,7 +32,8 @@ TAGS    ?=
 
 LDFLAGS = -s -w -X main.version=$(VERSION)
 
-.PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos
+.PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos \
+	wasm serve install-jail
 
 all: build
 
@@ -45,6 +51,7 @@ test:
 	@cc="$${CC:-cc}"; \
 	if [ "$$(uname -s)" = Darwin ]; then cc=clang; fi; \
 	CGO_ENABLED=1 CC="$$cc" $(GO) test ./...
+	GOOS=js GOARCH=wasm $(GO) vet ./...
 
 install: build install-desktop
 	install -d $(DESTDIR)$(PREFIX)/bin
@@ -125,3 +132,61 @@ deps:
 	@echo "  Arch:          sudo pacman -S gcc pkgconf wayland libx11 libxkbcommon-x11 libxcursor libxfixes mesa vulkan-headers"
 	@echo "  FreeBSD:       pkg install go pkgconf libX11 libxkbcommon libXcursor libXfixes wayland mesa-libs"
 	@echo "  macOS:         xcode-select --install"
+
+# Browser version (WebAssembly). The editor is the same program; the
+# platform_js.go files replace the file system with the browser's file
+# picker, downloads and localStorage. bin/web is everything a web server
+# needs; bin/mdedit-web is a small server for it (see cmd/mdedit-web).
+WEB  = bin/web
+PORT ?= 8080
+# The server is built for this machine; to build it for the jail elsewhere:
+# make wasm SERVER_GOOS=freebsd SERVER_GOARCH=amd64
+SERVER_GOOS   ?=
+SERVER_GOARCH ?=
+
+wasm:
+	@mkdir -p $(WEB)
+	rm -f $(WEB)/*.gz $(WEB)/*.br
+	GOOS=js GOARCH=wasm $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(WEB)/mdedit.wasm ./cmd/mdedit
+	@root=$$($(GO) env GOROOT); js=$$root/lib/wasm/wasm_exec.js; \
+	if [ ! -f $$js ]; then js=$$root/misc/wasm/wasm_exec.js; fi; \
+	echo "cp $$js $(WEB)/wasm_exec.js"; cp $$js $(WEB)/wasm_exec.js
+	cp web/index.html $(WEB)/index.html
+	cp assets/icons/64x64/apps/mdedit.png $(WEB)/icon.png
+	gzip -9 -k -f $(WEB)/mdedit.wasm $(WEB)/wasm_exec.js $(WEB)/index.html
+	@if command -v brotli >/dev/null 2>&1; then \
+		echo "brotli -q 11 $(WEB)/mdedit.wasm"; brotli -f -k -q 11 $(WEB)/mdedit.wasm; \
+	fi
+	CGO_ENABLED=0 GOOS=$(SERVER_GOOS) GOARCH=$(SERVER_GOARCH) $(GO) build -trimpath -ldflags '-s -w' -o bin/mdedit-web ./cmd/mdedit-web
+	@echo "Built $(WEB) and bin/mdedit-web; try: make serve"
+
+serve:
+	@if [ ! -f $(WEB)/mdedit.wasm ] || [ ! -x bin/mdedit-web ]; then echo "run make wasm first"; exit 1; fi
+	./bin/mdedit-web -dir $(WEB) -addr localhost:$(PORT)
+
+# Install the browser version into a FreeBSD jail, from the host: the web
+# files into WEBROOT, the server and its rc.d service into the jail, the
+# service enabled. Build first as yourself (make wasm), then: sudo make
+# install-jail. If the jail is running, the service is (re)started.
+JAIL_ROOT ?= /zroot/sylve/jails/100
+WEBROOT   ?= /usr/local/www/content_renderer
+
+install-jail:
+	@if [ "$$(id -u)" != 0 ]; then echo "install-jail must run as root: sudo make install-jail"; exit 1; fi
+	@if [ ! -f $(WEB)/mdedit.wasm ] || [ ! -x bin/mdedit-web ]; then \
+		echo "nothing to install: run make wasm first (as yourself, not with sudo)"; exit 1; fi
+	@if [ ! -d $(JAIL_ROOT)/usr/local ]; then echo "no jail at $(JAIL_ROOT) (set JAIL_ROOT=…)"; exit 1; fi
+	install -d -m 755 $(JAIL_ROOT)$(WEBROOT)
+	rm -f $(JAIL_ROOT)$(WEBROOT)/*.gz $(JAIL_ROOT)$(WEBROOT)/*.br
+	install -m 644 $(WEB)/* $(JAIL_ROOT)$(WEBROOT)/
+	install -d -m 755 $(JAIL_ROOT)/usr/local/bin $(JAIL_ROOT)/usr/local/etc/rc.d
+	install -m 755 bin/mdedit-web $(JAIL_ROOT)/usr/local/bin/mdedit-web
+	install -m 755 assets/freebsd/mdedit_web $(JAIL_ROOT)/usr/local/etc/rc.d/mdedit_web
+	sysrc -R $(JAIL_ROOT) mdedit_web_enable=YES mdedit_web_dir=$(WEBROOT)
+	@jid=$$(jls jid path 2>/dev/null | awk -v p=$(JAIL_ROOT) '$$2 == p { print $$1 }'); \
+	if [ -n "$$jid" ]; then \
+		echo "jexec $$jid service mdedit_web restart"; jexec $$jid service mdedit_web restart; \
+	else \
+		echo "The jail isn't running; the service starts with it."; \
+	fi
+	@echo "Installed. Port and HTTPS: sysrc -R $(JAIL_ROOT) mdedit_web_addr=:8080 mdedit_web_flags=…"

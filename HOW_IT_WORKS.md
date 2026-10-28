@@ -42,15 +42,22 @@
     - [7.6 The preview: decode, cache, arrive late, click](#76-the-preview-decode-cache-arrive-late-click)
     - [7.7 The PDF](#77-the-pdf)
     - [7.8 When an image doesn't show](#78-when-an-image-doesnt-show)
-  - [8. The layers in detail](#8-the-layers-in-detail)
-    - [8.1 internal/ui — the window](#81-internalui--the-window)
-    - [8.2 internal/edit — editing commands as pure functions](#82-internaledit--editing-commands-as-pure-functions)
-    - [8.3 internal/mdmodel — Markdown to blocks](#83-internalmdmodel--markdown-to-blocks)
-    - [8.4 internal/render — blocks to primitives](#84-internalrender--blocks-to-primitives)
-    - [8.5 internal/pdfout — primitives to PDF](#85-internalpdfout--primitives-to-pdf)
-    - [8.6 internal/tex — maths](#86-internaltex--maths)
-    - [8.7 internal/imgcache and internal/youtube](#87-internalimgcache-and-internalyoutube)
-  - [9. Recipes: where to add things](#9-recipes-where-to-add-things)
+  - [8. The browser version (WebAssembly)](#8-the-browser-version-webassembly)
+    - [8.1 The platform seam in internal/ui](#81-the-platform-seam-in-internalui)
+    - [8.2 Asynchronous results: picker, file reading, PDF export](#82-asynchronous-results-picker-file-reading-pdf-export)
+    - [8.3 Storage](#83-storage)
+    - [8.4 The web page and keys](#84-the-web-page-and-keys)
+    - [8.5 Building, serving, installing](#85-building-serving-installing)
+    - [8.6 Adding something that touches the outside world](#86-adding-something-that-touches-the-outside-world)
+  - [9. The layers in detail](#9-the-layers-in-detail)
+    - [9.1 internal/ui — the window](#91-internalui--the-window)
+    - [9.2 internal/edit — editing commands as pure functions](#92-internaledit--editing-commands-as-pure-functions)
+    - [9.3 internal/mdmodel — Markdown to blocks](#93-internalmdmodel--markdown-to-blocks)
+    - [9.4 internal/render — blocks to primitives](#94-internalrender--blocks-to-primitives)
+    - [9.5 internal/pdfout — primitives to PDF](#95-internalpdfout--primitives-to-pdf)
+    - [9.6 internal/tex — maths](#96-internaltex--maths)
+    - [9.7 internal/imgcache and internal/youtube](#97-internalimgcache-and-internalyoutube)
+  - [10. Recipes: where to add things](#10-recipes-where-to-add-things)
     - [Add an editing command (menu item, shortcut, maybe a toolbar icon)](#add-an-editing-command-menu-item-shortcut-maybe-a-toolbar-icon)
     - [Add a dialog](#add-a-dialog)
     - [Add a Markdown block type](#add-a-markdown-block-type)
@@ -58,11 +65,11 @@
     - [Add a new primitive kind](#add-a-new-primitive-kind)
     - [Add a TeX command](#add-a-tex-command)
     - [Add a keyboard behaviour inside the editor](#add-a-keyboard-behaviour-inside-the-editor)
-  - [10. Finding bugs](#10-finding-bugs)
+  - [11. Finding bugs](#11-finding-bugs)
     - [Symptom → where to look](#symptom--where-to-look)
     - [Tools](#tools)
     - [Gotchas](#gotchas)
-  - [11. Code style](#11-code-style)
+  - [12. Code style](#12-code-style)
 
 <!-- /toc -->
 
@@ -117,18 +124,21 @@ That is why the preview and the PDF can't drift apart.
 
 | Package | Responsibility | Depends on |
 |---|---|---|
-| `cmd/mdedit` | `main`: flags, `-pdf` export, opens the window | ui, mdmodel, pdfout |
+| `cmd/mdedit` | `main`: flags, `-pdf` export, opens the window (desktop and browser) | ui, mdmodel, pdfout |
+| `cmd/mdedit-web` | Static web server for the browser version (§8) | — |
 | `internal/ui` | Everything you see and click: window, editor, preview painter, menus, toolbar, dialogs, find bar, keys | edit, mdmodel, render, pdfout, tex, imgcache, youtube |
 | `internal/edit` | Formatting commands as **pure functions** on `State` (text + selection): bold, lists, headings, align, tables, TOC, search/replace, Enter/Tab | mdmodel (for TOC), youtube |
 | `internal/mdmodel` | Parses Markdown into a flat list of styled `Block`s; maths syntax; syntax highlighting | goldmark, chroma, youtube |
-| `internal/render` | Lays out a `Block` at a given width into a `Layout` of positioned `Prim`s | mdmodel, tex, imgcache |
+| `internal/render` | Lays out a `Block` at a given width into a `Layout` of positioned `Prim`s | mdmodel, tex, imgcache, vfs |
 | `internal/tex` | TeX maths typesetter; embeds the STIX Two Math font; glyph outlines | x/image/font/sfnt |
-| `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, fpdf |
-| `internal/imgcache` | Downloads YouTube stills into an on-disk cache (async for the preview, sync for PDF) | youtube |
+| `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, vfs, fpdf |
+| `internal/imgcache` | Downloads YouTube stills into a cache (async for the preview, sync for PDF) | youtube, vfs |
+| `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§8) | — |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
-| `internal/lint` | A test enforcing the code style (see §11) | — |
+| `internal/lint` | A test enforcing the code style (see §12) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 | `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
+| `web/`, `assets/freebsd/` | The web page around the browser version; the FreeBSD rc.d script for `mdedit-web` (§8) | — |
 
 Rule of thumb: **lower layers never import higher ones.** If you find
 yourself wanting `render` to import `ui`, the code belongs somewhere else.
@@ -1472,9 +1482,179 @@ page.
 
 ---
 
-## 8. The layers in detail
+## 8. The browser version (WebAssembly)
 
-### 8.1 `internal/ui` — the window
+mdedit also runs in a web browser. It is **the same program**: `make wasm`
+compiles `cmd/mdedit` with `GOOS=js GOARCH=wasm`, and Gio has a browser
+backend that draws the window into a `<canvas>` with WebGL — through the
+same shaders as on the desktop (§6.8). Parsing, layout, maths,
+highlighting, the preview, the PDF writer and the UI are untouched.
+
+What a web page *can't* do is touch the computer: Go's `os.ReadFile` and
+friends return "not implemented" in a browser, and `exec.Command` can't
+run anything. So everything that reaches outside the program sits behind
+two seams, each with a desktop and a browser side chosen by **build tags**:
+
+| Seam | Desktop (`//go:build !js`) | Browser (`//go:build js`) |
+|---|---|---|
+| `internal/ui/platform_*.go` | `platform_desktop.go`: mdedit's file dialog, `os` files, `settings.json`, crash-recovery file, `open`/`xdg-open` | `platform_js.go`: the browser's file picker, downloads, `localStorage`, `window.open` |
+| `internal/vfs` | `vfs_disk.go`: the disk | `vfs_mem.go`: a map in memory |
+
+The two files of a pair define the **same functions and types**; the
+rest of the code calls them without knowing which one it gets. The
+desktop functions were moved into `platform_desktop.go` unchanged, and
+the desktop screenshots and PDFs are pixel-identical to before the browser
+version existed.
+
+### 8.1 The platform seam in `internal/ui`
+
+What each side provides:
+
+| Function / type | Desktop | Browser |
+|---|---|---|
+| `loadInitial(path)` | Read the file named on the command line | Restore the text from `localStorage` |
+| `showOpenDialog()` | `NewFileDialog` (mdedit's own dialog) | A hidden `<input type="file">`, clicked |
+| `save(then)`, `saveAs(then)` | Write the file (asking for a name first if needed) | Download `name.md` |
+| `exportDialog()` | File dialog, then `writePDF` | Make the PDF on a goroutine, then download it |
+| `openURL(url)` | `open` / `xdg-open` / `rundll32` | `window.open(url, "_blank")` |
+| `readSettings`, `writeSettings` | `<UserConfigDir>/mdedit/settings.json` | `localStorage["mdedit.settings"]` |
+| `saveRecovery()` | Unsaved text to the cache folder on close | Nothing: `autosave` has kept it |
+| `autosave()` | Nothing | Text, saved text and name to `localStorage`, on every change |
+| `quitCommands()` | File → Quit | None: a tab is closed by the browser |
+| `platformFonts()` | None: the system's fonts cover ⌘ and arrows | STIX Two Math (`tex.MathFont`), for ⌘ ⇧ ← … |
+| `platformState`, `handleArrivals()` | Empty | Results from browser callbacks (below) |
+
+Three of these are called from shared code: `New` builds the shaper with
+`append(gofont.Collection(), platformFonts()...)`, `reparse` ends with
+`a.autosave()`, and `handleOpenRequest` (every frame) starts with
+`a.handleArrivals()`. `fileMenu` appends `a.quitCommands()`.
+
+**Fonts.** On the desktop, Gio's shaper also loads the system's fonts, so
+a ⌘ in the status bar is found in some system font. A web page has no
+system fonts; without help, ⌘ is the missing-glyph box (§6.2). The browser
+side adds the maths font, which has ⌘, ⇧ and the arrows.
+
+### 8.2 Asynchronous results: picker, file reading, PDF export
+
+On the desktop, opening a file is a function call. In the browser it is a
+chain of events that arrive later, from JavaScript:
+
+```
+showOpenDialog ─▶ <input type=file>.click()        (needs a recent click or key press,
+                                                    or the browser ignores it)
+      … the user picks a file …
+fileChosen (JS "change" event) ─▶ file.text()      (a Promise)
+      … the browser reads it …
+textRead (Promise resolved) ─▶ platform.opened = {name, text}; invalidate()
+      … next frame …
+handleArrivals ─▶ a.load(name, text)
+```
+
+JavaScript callbacks are Go methods wrapped once with `js.FuncOf`
+(`initCallbacks`: `js.FuncOf(a.fileChosen)` — a method value, no
+closure). They run outside the frame loop, so they don't touch the editor:
+they store the result in `a.platform` under its mutex and ask for a frame;
+`handleArrivals` applies it on the frame goroutine. This is the same
+pattern as `ui/app.go: RequestOpen` for files the macOS Finder asks to open.
+
+**Export PDF** works the same way: `exportDialog` starts
+`exportInBackground` on a goroutine (the export may wait for video stills
+to download, §7.7, and blocking the frame goroutine on the network would
+freeze the page), which writes the PDF into a buffer, downloads it and
+reports through `deliver(status)`.
+
+**Downloads** (`download`) wrap the bytes in a `Blob`, give it a temporary
+URL, and click a hidden `<a download="name">` pointing at it. The URL is
+released a minute later (`revokeURL`).
+
+### 8.3 Storage
+
+- **The document** is written to `localStorage` on every change
+  (`autosave`): `mdedit.text` (the editor's text), `mdedit.saved` (as last
+  opened or downloaded, so the "unsaved" dot survives a reload) and
+  `mdedit.name`. `loadInitial` reads all three **before** calling `load`,
+  because `load` itself autosaves and would overwrite them.
+- **Settings** go to `mdedit.settings`, with the same JSON as
+  `settings.json`; the first visit follows the browser's dark mode
+  (`gioui.org/x/pref/theme` asks the `prefers-color-scheme` media query).
+- **Images** (`internal/vfs`): `imgcache` stores downloaded stills with
+  `vfs.WriteFile`; `render.ImageFileSize`, `ui/images.go` and
+  `pdfout.registerImage` read them with `vfs.ModTime` and `vfs.Open`. On
+  the desktop that is the disk; in the browser, a map that lasts as long
+  as the page. Local images next to a document resolve to paths that
+  aren't in the map, so they show their alt text (§7.8).
+- **Network:** `net/http` works in the browser (Go uses `fetch`). The
+  browser only lets a page read images from another site if that site
+  allows it; YouTube's still servers send `Access-Control-Allow-Origin: *`.
+
+The PDF writer needed one change for this: fpdf used to open image files
+itself (`ImageOptions(path)`), which can't work on a map in memory.
+`pdfout/draw.go: registerImage` now reads the file through `vfs` and
+hands fpdf a reader (`RegisterImageOptionsReader`); `ImageOptions` then
+finds it by name.
+
+### 8.4 The web page and keys
+
+`web/index.html` loads Go's `wasm_exec.js`, fetches `mdedit.wasm` and
+starts it; Gio puts its canvas into `<div id="giowindow">`.
+
+Gio passes key presses to mdedit but doesn't stop the browser from
+acting on them too: Ctrl+S would also open "Save page", Ctrl+F the
+browser's search. The page listens to `keydown` first and cancels the
+browser's default for Ctrl/⌘ combinations, except copy, cut, paste and
+zoom (and paste-as-text and two developer-tools keys with Shift).
+Cancelling the default doesn't stop the event, so Gio still gets it.
+Some keys can't be taken from the browser at all (Ctrl/⌘+N, T, W).
+
+Gio's browser backend picks the shortcut modifier from the browser's
+platform: ⌘ on a Mac, Ctrl elsewhere (`key.ModShortcut` is a variable in
+the `js` build), so the menus and status bar show the right one.
+
+**Clipboard:** Gio uses the browser's Clipboard API, which browsers only
+offer on HTTPS pages and on `localhost`. Over plain HTTP from another
+machine, mdedit's copy and paste do nothing — serve it over HTTPS.
+
+### 8.5 Building, serving, installing
+
+`make wasm` (Makefile):
+
+1. `GOOS=js GOARCH=wasm go build ./cmd/mdedit` → `bin/web/mdedit.wasm`
+   (about 30 MB: the Go runtime, Gio, goldmark, chroma's lexers and the
+   fonts);
+2. copies Go's `wasm_exec.js` (from `$(go env GOROOT)/lib/wasm`, or
+   `misc/wasm` for older Go), `web/index.html` and the icon;
+3. compresses: `.gz` always, `.br` if `brotli` is installed (about 8 and
+   5 MB);
+4. builds `bin/mdedit-web` for this machine, without cgo.
+
+`cmd/mdedit-web` is a small static server: for each request it sends the
+best compressed copy the browser accepts (`files.pick`), with the
+*original* file's content type (`application/wasm`, not `application/gzip`)
+and `Content-Encoding`; `Cache-Control: no-cache` makes browsers check for
+a new build on every visit (an unchanged file costs a `304`). With
+`-tls-cert` and `-tls-key` it serves HTTPS.
+
+`make install-jail` (FreeBSD host, as root) copies `bin/web` into the
+jail's web folder, `mdedit-web` and `assets/freebsd/mdedit_web` (the rc.d
+script) into the jail, enables the service with `sysrc -R <jail root>`,
+and restarts it with `jexec` if `jls` shows the jail running. The rc.d
+script runs the server under `daemon(8)` as user `www`, with its pid file
+in `/var/run/mdedit_web/` and its log in `/var/log/mdedit_web.log`, both
+created for that user before start (`mdedit_web_prestart`).
+
+### 8.6 Adding something that touches the outside world
+
+If a new feature reads or writes files, runs programs, or opens
+anything: put the platform-specific part in **both** `platform_desktop.go`
+and `platform_js.go` (or use `vfs` for data files), keep the shared code
+calling it, and run `make test` — the `GOOS=js` vet step fails if the
+browser side is missing. Then try it with `make wasm && make serve`.
+
+---
+
+## 9. The layers in detail
+
+### 9.1 `internal/ui` — the window
 
 | File | What's in it |
 |---|---|
@@ -1491,6 +1671,7 @@ page.
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
 | `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed` |
+| `platform_desktop.go`, `platform_js.go` | Everything that differs between desktop and browser: Open/Save/Export, settings storage, links, Quit, autosave, fonts (§8) |
 | `colors.go`, `theme.go` | The window's colours (`uiColors`: `lightColors`, `darkColors`, the current one in `col`); switching theme (`setDark`); `settings.json` |
 
 **Gio style used throughout:** no closures. A piece of UI is a named method
@@ -1537,7 +1718,7 @@ At start-up `startDark` uses the saved choice in
 `cmdToggleTheme` (View → Dark Theme, Ctrl+Shift+D) flips it and saves it.
 The PDF exporter always uses `render.Light`.
 
-### 8.2 `internal/edit` — editing commands as pure functions
+### 9.2 `internal/edit` — editing commands as pure functions
 
 | File | Commands |
 |---|---|
@@ -1568,7 +1749,7 @@ func SetHeading(s State, level int) State {
 }
 ```
 
-### 8.3 `internal/mdmodel` — Markdown to blocks
+### 9.3 `internal/mdmodel` — Markdown to blocks
 
 | File | What's in it |
 |---|---|
@@ -1605,7 +1786,7 @@ func (b *builder) block(n ast.Node) {
 `emit` stamps every block with its source line, its containers (`Decor`)
 and any active alignment.
 
-### 8.4 `internal/render` — blocks to primitives
+### 9.4 `internal/render` — blocks to primitives
 
 | File | What's in it |
 |---|---|
@@ -1632,7 +1813,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 }
 ```
 
-### 8.5 `internal/pdfout` — primitives to PDF
+### 9.5 `internal/pdfout` — primitives to PDF
 
 | File | What's in it |
 |---|---|
@@ -1641,7 +1822,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 | `draw.go` | `drawPrim` dispatcher and one function per `Prim` kind |
 | `fonts.go` | The embedded Go fonts, measuring, and **fallback glyphs** (⌘, ⇧, ✓ … drawn as outlines from the maths font) |
 
-### 8.6 `internal/tex` — maths
+### 9.6 `internal/tex` — maths
 
 | File | What's in it |
 |---|---|
@@ -1655,7 +1836,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 `tex.Layout(src, display)` returns a `Box` of `Item`s in em units;
 `render/render.go: mathPrims` turns them into `PGlyph`/`PRect`/`PPoly` prims.
 
-### 8.7 `internal/imgcache` and `internal/youtube`
+### 9.7 `internal/imgcache` and `internal/youtube`
 
 `imgcache.Fetch(src, done)` downloads in the background (the preview calls
 it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
@@ -1666,7 +1847,7 @@ images and videos through all layers.
 
 ---
 
-## 9. Recipes: where to add things
+## 10. Recipes: where to add things
 
 ### Add an editing command (menu item, shortcut, maybe a toolbar icon)
 
@@ -1708,7 +1889,7 @@ Touch these, in order — the compiler won't remind you about the switches:
    may split it across pages.
 4. If you need a new kind of shape, see the next recipe.
 5. Test: `mdmodel/*_test.go` for parsing, a render or PDF test, and a
-   screenshot scene (§10).
+   screenshot scene (§11).
 
 ### Add an inline style or inline element
 
@@ -1748,7 +1929,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 10. Finding bugs
+## 11. Finding bugs
 
 ### Symptom → where to look
 
@@ -1782,6 +1963,9 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   (split view, menus, dialogs, find bar, maths, videos …, and the same in
   the dark theme as `dark-*.png`) to PNG files.
   Add a scene in `ui/screenshot_test.go` when you add something visual.
+- **The browser version:** `make wasm && make serve`, then open
+  `http://localhost:8080`. The browser's developer tools (F12) show Go's
+  panics and `println` output in the console.
 - **The UI test harness** (`ui/harness_test.go`) drives the real `App`
   through Gio's input router: `h.press(key, mods)`, `h.rightClick(x, y)`,
   `h.run(cmd)`, `h.setText(text, start, end)`, `h.expect(text)`,
@@ -1816,12 +2000,18 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   registered in the *previous* frame, and shortcuts aren't polled while a
   menu is open. In the harness, call `h.frame()` after closing a menu
   before pressing a shortcut.
+- **Two builds:** `platform_js.go` and `vfs_mem.go` only compile for the
+  browser (`//go:build js`), their desktop twins only for the desktop
+  (`!js`). A function added to one must be added to the other.
+  `make test` vets the browser build too (`GOOS=js GOARCH=wasm go vet`),
+  which catches a missing twin; the UI tests themselves only run on the
+  desktop.
 - **macOS builds** need `CC=clang` (the Makefile sets it); a Homebrew GCC
   can't compile Gio's Objective-C.
 
 ---
 
-## 11. Code style
+## 12. Code style
 
 Enforced by `internal/lint/style_test.go`, which runs with `make test`:
 

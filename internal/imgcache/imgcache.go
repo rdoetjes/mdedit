@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"mdedit/internal/vfs"
 	"mdedit/internal/youtube"
 )
 
@@ -51,7 +52,7 @@ func Allowed(src string) bool { return allowed(src) }
 // Path returns the cached file of a downloaded image, if there is one.
 func Path(src string) (string, bool) {
 	p := file(src)
-	if _, err := os.Stat(p); err != nil {
+	if _, err := vfs.ModTime(p); err != nil {
 		return "", false
 	}
 	return p, true
@@ -138,7 +139,7 @@ func download(src string) error {
 	if err != nil {
 		return err
 	}
-	return store(file(src), data)
+	return vfs.WriteFile(file(src), data) // atomic: readers never see half an image
 }
 
 var errNotFound = errors.New("not found")
@@ -164,18 +165,6 @@ func fetch(src string) ([]byte, error) {
 		return nil, fmt.Errorf("%s: not an image: %w", src, err)
 	}
 	return data, nil
-}
-
-// store writes the file atomically, so readers never see a partial image.
-func store(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
 
 // youtubeFallback is the still that exists for every video, for videos

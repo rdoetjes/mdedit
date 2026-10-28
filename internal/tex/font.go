@@ -16,6 +16,11 @@ import (
 //go:embed fonts/STIXTwoMath-Regular.ttf
 var stixMath []byte
 
+// MathFont returns the embedded STIX Two Math font file. The browser
+// version uses it as a fallback for symbols such as ⌘ that the Go fonts
+// lack, where desktop systems have fonts of their own.
+func MathFont() []byte { return stixMath }
+
 // Faces. Glyphs missing from the maths font fall back to Go Regular.
 const (
 	FaceMath uint8 = iota

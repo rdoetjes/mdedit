@@ -85,10 +85,6 @@ func (a *App) newDoc()     { a.confirmDiscard(actNew) }
 func (a *App) openDialog() { a.confirmDiscard(actOpenDialog) }
 func (a *App) quit()       { a.confirmDiscard(actQuit) }
 
-func (a *App) showOpenDialog() {
-	a.dialog = NewFileDialog("Open Markdown file", a.dir(), "", false, mdExts, a.openChosen)
-}
-
 func (a *App) openChosen(p string) {
 	a.dialog = nil
 	if p != "" {
@@ -106,30 +102,11 @@ func (a *App) openFile(p string) {
 	a.setStatus("Opened %s", p)
 }
 
-// save writes the document, asking for a name if it has none, and then
-// performs `then`.
-func (a *App) save(then action) {
-	if a.path == "" {
-		a.saveAs(then)
-		return
-	}
-	a.writeFile(a.path, then)
-}
-
-func (a *App) saveAs(then action) {
-	a.flow.afterSave = then
-	a.dialog = NewFileDialog("Save Markdown file", a.dir(), a.baseName()+".md", true, mdExts[:1], a.saveAsChosen)
-}
-
 func (a *App) saveAsChosen(p string) {
 	a.dialog = nil
 	if p != "" {
 		a.confirmOverwrite(p, targetMarkdown, p != a.path)
 	}
-}
-
-func (a *App) exportDialog() {
-	a.dialog = NewFileDialog("Export PDF", a.dir(), a.baseName()+".pdf", true, []string{".pdf"}, a.exportChosen)
 }
 
 func (a *App) exportChosen(p string) {

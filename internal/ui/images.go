@@ -2,12 +2,12 @@ package ui
 
 import (
 	"image"
-	"os"
 
 	"gioui.org/op/paint"
 
 	"mdedit/internal/imgcache"
 	"mdedit/internal/render"
+	"mdedit/internal/vfs"
 )
 
 // imageEntry caches a decoded image, or the failure to decode one, for a
@@ -29,11 +29,11 @@ func (p *Preview) image(src string) *imageEntry {
 		}
 		return nil
 	}
-	st, err := os.Stat(path)
-	if err != nil || st.IsDir() {
+	mod, err := vfs.ModTime(path) // folders count as missing
+	if err != nil {
 		return nil
 	}
-	e := p.cachedImage(path, st.ModTime().UnixNano())
+	e := p.cachedImage(path, mod)
 	if e.failed {
 		return nil
 	}
@@ -62,7 +62,7 @@ func (p *Preview) imageArrived() {
 }
 
 func decodeImage(path string) *imageEntry {
-	f, err := os.Open(path)
+	f, err := vfs.Open(path)
 	if err != nil {
 		return &imageEntry{failed: true}
 	}

@@ -146,7 +146,7 @@ func (a *App) buildToolbar() {
 }
 
 func (a *App) fileMenu() *menu {
-	return &menu{"File", []*command{
+	items := []*command{
 		newCommand("New", "N", 0, a.cmdNew),
 		newCommand("Open…", "O", 0, a.cmdOpen),
 		nil,
@@ -154,9 +154,8 @@ func (a *App) fileMenu() *menu {
 		newCommand("Save As…", "S", key.ModShift, a.cmdSaveAs),
 		nil,
 		newCommand("Export PDF…", "E", 0, a.cmdExport),
-		nil,
-		newCommand("Quit", "Q", 0, a.cmdQuit),
-	}}
+	}
+	return &menu{"File", append(items, a.quitCommands()...)}
 }
 
 func (a *App) editMenu() *menu {

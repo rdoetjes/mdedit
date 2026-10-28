@@ -10,8 +10,10 @@ in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and Wayla
 - [MDEdit](#mdedit)
   - [Building](#building)
   - [Usage](#usage)
+    - [YouTube videos](#youtube-videos)
     - [Maths](#maths)
     - [Fenced blocks (code blocks)](#fenced-blocks-code-blocks)
+  - [In the browser (WebAssembly)](#in-the-browser-webassembly)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
 
@@ -167,6 +169,64 @@ If the window is closed with unsaved changes, they are written to
 `~/.cache/mdedit/` (`~/Library/Caches/mdedit/` on macOS) and the path is
 printed on stderr.
 
+## In the browser (WebAssembly)
+
+The same editor also runs in a web browser. The desktop version remains the
+main one; the browser version is the same program compiled to WebAssembly,
+with a different way of reaching files.
+
+    make wasm     # bin/web (the web page) and bin/mdedit-web (a small web server)
+    make serve    # try it on http://localhost:8080
+
+`bin/web` holds `index.html`, `mdedit.wasm` (with compressed `.gz` and, if
+the `brotli` command exists, `.br` copies), Go's `wasm_exec.js` and the icon.
+Any web server can serve it if it sends `.wasm` files as `application/wasm`;
+`mdedit-web` does that and sends the compressed copies (about 5–8 MB instead
+of 30 MB).
+
+**In a FreeBSD jail.** On the FreeBSD host, build as yourself, then install
+as root:
+
+    make wasm
+    sudo make install-jail
+
+This copies the web files to
+`/zroot/sylve/jails/100/usr/local/www/content_renderer/`, the server to the
+jail's `/usr/local/bin/mdedit-web`, and the service script to the jail's
+`/usr/local/etc/rc.d/mdedit_web`; it enables the service in the jail's
+`rc.conf` and, if the jail is running, (re)starts it. Override the
+locations with `JAIL_ROOT=…` and `WEBROOT=…`. The service listens on port
+8080 as user `www`; change it with:
+
+    sudo sysrc -R /zroot/sylve/jails/100 mdedit_web_addr=":8080"
+    sudo sysrc -R /zroot/sylve/jails/100 mdedit_web_flags="-tls-cert /usr/local/etc/ssl/mdedit.crt -tls-key /usr/local/etc/ssl/mdedit.key"
+
+and `service mdedit_web restart` inside the jail. Logs go to the jail's
+`/var/log/mdedit_web.log`.
+
+**Use HTTPS.** Browsers only allow web pages to use the clipboard over
+HTTPS (or on `localhost`). Over plain HTTP from another machine, copy and
+paste within mdedit won't work. Give `mdedit-web` a certificate
+(`-tls-cert`, `-tls-key`), or put it behind a web server or proxy that
+does HTTPS.
+
+**What is different in the browser:**
+
+- **Files.** A web page can't read or write your disk. File → Open shows
+  the browser's file picker; Save, Save As and Export PDF download the
+  file. The text is kept in the browser (localStorage) as you type, so a
+  reload or a closed tab loses nothing, and the next visit continues where
+  you were.
+- **Images.** Images next to a document can't be read, so they show their
+  alt text; YouTube stills work as on the desktop.
+- **Shortcuts.** On a Mac they use ⌘, elsewhere Ctrl. Browsers keep a few
+  keys for themselves (Ctrl/⌘+N, T and W): use the menus for New and Insert
+  Table. There is no Quit; close the tab.
+- **Theme.** The first visit follows the browser's light or dark mode;
+  View → Dark Theme is remembered in the browser.
+- **Size.** The first visit downloads about 5–8 MB; after that the
+  browser's cache is used until a new version is installed.
+
 ## Supported Markdown
 
 CommonMark plus GitHub extensions: headings (ATX and Setext), paragraphs and
@@ -179,7 +239,8 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
 
 ## Layout
 
-    cmd/mdedit         entry point
+    cmd/mdedit         entry point (desktop and browser)
+    cmd/mdedit-web     web server for the browser version
     internal/mdmodel   Markdown → flat list of styled blocks (goldmark), highlighting
     internal/render    device-independent layout: blocks → positioned primitives
     internal/ui        Gio window, preview painter, file dialog
@@ -188,9 +249,12 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/tex       TeX maths typesetter (embedded STIX Two Math)
     internal/youtube   YouTube URLs and video IDs
     internal/imgcache  downloads and caches YouTube stills
+    internal/vfs       file storage for images: the disk, or memory in the browser
     internal/lint      code-style test: no anonymous functions, ≤4 indent levels, ≤40-line functions
     tools/mkicon       draws the application icon
     tools/glyphdump    prints how a character is stored in the font (see HOW_IT_WORKS.md §6)
+    web/index.html     the web page around the browser version
+    assets/freebsd     rc.d script for mdedit-web
 
 The preview and the PDF share `internal/render`, so both use the same layout.
 
