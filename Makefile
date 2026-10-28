@@ -31,6 +31,9 @@ BIN     ?= bin/mdedit
 TAGS    ?=
 
 LDFLAGS = -s -w -X main.version=$(VERSION)
+# -buildvcs=false: don't ask git for build information. The version comes
+# from VERSION, and git refuses to run as root in a checkout owned by
+# someone else ("dubious ownership"), which broke sudo make install.
 
 .PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos \
 	wasm serve install-jail
@@ -41,8 +44,8 @@ build:
 	@mkdir -p bin
 	@cc="$${CC:-cc}"; \
 	if [ "$$(uname -s)" = Darwin ]; then cc=clang; fi; \
-	echo "CGO_ENABLED=1 CC=$$cc $(GO) build -trimpath -tags '$(TAGS)' -o $(BIN) ./cmd/mdedit"; \
-	CGO_ENABLED=1 CC="$$cc" $(GO) build -trimpath -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/mdedit
+	echo "CGO_ENABLED=1 CC=$$cc $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -o $(BIN) ./cmd/mdedit"; \
+	CGO_ENABLED=1 CC="$$cc" $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/mdedit
 
 run: build
 	./$(BIN) $(FILE)
@@ -147,7 +150,7 @@ SERVER_GOARCH ?=
 wasm:
 	@mkdir -p $(WEB)
 	rm -f $(WEB)/*.gz $(WEB)/*.br
-	GOOS=js GOARCH=wasm $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(WEB)/mdedit.wasm ./cmd/mdedit
+	GOOS=js GOARCH=wasm $(GO) build -buildvcs=false -trimpath -ldflags '$(LDFLAGS)' -o $(WEB)/mdedit.wasm ./cmd/mdedit
 	@root=$$($(GO) env GOROOT); js=$$root/lib/wasm/wasm_exec.js; \
 	if [ ! -f $$js ]; then js=$$root/misc/wasm/wasm_exec.js; fi; \
 	echo "cp $$js $(WEB)/wasm_exec.js"; cp $$js $(WEB)/wasm_exec.js
@@ -157,7 +160,7 @@ wasm:
 	@if command -v brotli >/dev/null 2>&1; then \
 		echo "brotli -q 11 $(WEB)/mdedit.wasm"; brotli -f -k -q 11 $(WEB)/mdedit.wasm; \
 	fi
-	CGO_ENABLED=0 GOOS=$(SERVER_GOOS) GOARCH=$(SERVER_GOARCH) $(GO) build -trimpath -ldflags '-s -w' -o bin/mdedit-web ./cmd/mdedit-web
+	CGO_ENABLED=0 GOOS=$(SERVER_GOOS) GOARCH=$(SERVER_GOARCH) $(GO) build -buildvcs=false -trimpath -ldflags '-s -w' -o bin/mdedit-web ./cmd/mdedit-web
 	@echo "Built $(WEB) and bin/mdedit-web; try: make serve"
 
 serve:
