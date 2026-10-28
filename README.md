@@ -92,6 +92,16 @@ and the convention markdown-toc and VS Code use). Right-click in the editor
 or preview and choose Update Table of Contents to regenerate it after
 editing headings; the right-click menu also has Cut, Copy and Paste.
 
+The spelling of the text is checked as you type: misspelt words get a red
+wavy underline once the caret has left them. Right-click one to see the
+most likely corrections at the top of the menu; click one to replace the
+word. Add to Dictionary remembers the word for good (in `settings.json`),
+Ignore until mdedit quits. Code, maths, HTML, link targets, URLs, file
+names, words with digits, acronyms in capitals and camelCase words aren't
+checked. Edit → Hide Spelling Errors turns the checking off. The dictionary
+is English (American and British spellings), from
+[SCOWL](http://wordlist.aspell.net), built into the program.
+
 ### YouTube videos
 
 Videos use GitHub's notation, a link around the video's still:

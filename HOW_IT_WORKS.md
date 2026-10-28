@@ -57,6 +57,7 @@
     - [9.5 internal/pdfout — primitives to PDF](#95-internalpdfout--primitives-to-pdf)
     - [9.6 internal/tex — maths](#96-internaltex--maths)
     - [9.7 internal/imgcache and internal/youtube](#97-internalimgcache-and-internalyoutube)
+    - [9.8 internal/spell — spell checking](#98-internalspell--spell-checking)
   - [10. Recipes: where to add things](#10-recipes-where-to-add-things)
     - [Add an editing command (menu item, shortcut, maybe a toolbar icon)](#add-an-editing-command-menu-item-shortcut-maybe-a-toolbar-icon)
     - [Add a dialog](#add-a-dialog)
@@ -135,6 +136,7 @@ That is why the preview and the PDF can't drift apart.
 | `internal/imgcache` | Downloads YouTube stills into a cache (async for the preview, sync for PDF) | youtube, vfs |
 | `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§8) | — |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
+| `internal/spell` | Spell checking: the embedded English word list, finding misspelt words in Markdown, suggestions | mdmodel |
 | `internal/lint` | A test enforcing the code style (see §12) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 | `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
@@ -1678,6 +1680,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `menubar.go`, `popup.go` | Menu bar titles; drop-down and context menu items |
 | `toolbar.go`, `statusbar.go` | Icon toolbar; status line |
 | `findbar.go`, `findbar_view.go` | Search/replace logic and view, match highlighting |
+| `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
 | `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed` |
@@ -1854,6 +1857,40 @@ it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
 `pdfout/pdf.go: imageSize`). Only YouTube stills are allowed
 (`youtube.IsThumbnail`). Failures aren't retried for a minute. §7 follows
 images and videos through all layers.
+
+### 9.8 `internal/spell` — spell checking
+
+`en.txt.gz` is the word list (SCOWL size 60, American and British
+spellings; licence in `SCOWL-LICENSE.txt`), one word per line, prefixed
+with a digit for how common it is (0 = most common). `English()` loads it
+on first use, about 25 ms. `Dictionary.Correct` also accepts a capitalised
+or upper-case form of a known word and possessives (`'s`).
+
+`Check(dict, text, doc)` returns the misspelt words as rune offsets
+(`Miss`). It skips the source lines of code, maths and HTML blocks — taken
+from the parsed `doc`, so it agrees with the preview — and, within a line,
+inline code, inline maths, tags, link targets and entities (`check.go`).
+Everything else is cut into chunks of letters and word punctuation
+(`words.go`); a chunk that looks like a URL, file name or identifier is
+skipped, the rest is split at hyphens and each word looked up.
+
+`Suggest(word, n)` scans the dictionary words within two letters of the
+length and ranks them by a weighted edit distance (`suggest.go`): swapped
+and doubled letters are cheapest, then a neighbouring key on a QWERTY
+keyboard, then any other change; common words and words with the same
+first letter win ties. It takes about 15 ms, and runs only when the
+context menu opens.
+
+In the window (`ui/spelling.go`), `App.reparse` runs `Check` on every
+change. Right after the editor is laid out, `spellChecker.underline` asks
+the editor for the `Regions` of the misses near the caret (as the find bar
+does for its highlights), draws a wavy line below each region's baseline,
+and remembers the boxes. It also registers a pass-through pointer target
+over the editor, so a right-click arrives in editor coordinates;
+`handleClick` runs before `handleRightClick` in the same frame, finds the
+box under the pointer, and `openContextMenu` puts that word's corrections
+at the top of the menu. A correction is an ordinary edit
+(`edit.ReplaceWord`), so it is one undo step.
 
 ---
 

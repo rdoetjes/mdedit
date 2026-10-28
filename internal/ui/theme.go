@@ -12,7 +12,9 @@ import (
 
 // settings are the preferences kept between runs.
 type settings struct {
-	Theme string `json:"theme,omitempty"` // "light" or "dark"; empty follows the system
+	Theme      string   `json:"theme,omitempty"` // "light" or "dark"; empty follows the system
+	NoSpelling bool     `json:"noSpelling,omitempty"`
+	Words      []string `json:"words,omitempty"` // added to the dictionary
 }
 
 func loadSettings() settings {

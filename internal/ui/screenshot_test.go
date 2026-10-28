@@ -60,6 +60,7 @@ func (s *shooter) darkScenes() {
 	s.shot("dark-find.png")
 	s.h.press(key.NameEscape, 0)
 	s.scene("dark-highlight.png", highlightSample)
+	s.scene("dark-spelling.png", spellingSample)
 	s.darkMaths()
 	a.tableDialog()
 	s.shot("dark-dialog.png")
@@ -165,6 +166,16 @@ func (s *shooter) contentScenes() {
 	s.h.rightClick(700, 700)
 	s.shot("toc.png")
 	s.h.a.ctx.open = false
+	s.spellingScene()
+}
+
+// spellingScene shows misspelt words underlined and the corrections for
+// one of them.
+func (s *shooter) spellingScene() {
+	s.scene("spelling.png", spellingSample)
+	s.h.rightClickMiss(1)
+	s.shot("spelling-menu.png")
+	s.h.a.ctx.open = false
 }
 
 // videoScenes shows YouTube stills in the preview (downloading them if
@@ -218,3 +229,6 @@ const highlightSample = "```bash\n# build and run\nfor f in *.md; do\n  mdedit -
 	"```go\nfunc fib(n int) int {\n\tif n < 2 {\n\t\treturn n // base case\n\t}\n\treturn fib(n-1) + fib(n-2)\n}\n```\n"
 
 const tocSample = "# Guide\n\n## Install\n\n### Linux\n\n### FreeBSD\n\n## Usage\n\n### Shortcuts\n\n## Licence\n"
+
+const spellingSample = "# Speling\n\nThis sentense has a fwe mistakes, but `codde`, $x^2$ maths and\n" +
+	"[links](https://exampel.com) are left alone. Recieve the definately seperate words.\n"

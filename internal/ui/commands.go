@@ -85,6 +85,7 @@ type commands struct {
 	find, replace            *command
 	video                    *command
 	theme                    *command
+	spelling                 *command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -122,6 +123,7 @@ func (a *App) buildSharedCommands() {
 	c.updateTOC = newCommand("Update Table of Contents", "", 0, a.cmdUpdateTOC)
 	c.video = newCommand("YouTube Video…", "", 0, a.cmdVideo)
 	c.theme = newCommand("Dark Theme", "D", key.ModShift, a.cmdToggleTheme)
+	c.spelling = newCommand("Hide Spelling Errors", "", 0, a.cmdToggleSpelling)
 	c.find = newCommand("Find…", "F", 0, a.cmdFind)
 	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
@@ -167,6 +169,8 @@ func (a *App) editMenu() *menu {
 		a.cmds.find, a.cmds.replace,
 		newCommand("Find Next", "G", 0, a.cmdFindNext),
 		newCommand("Find Previous", "G", key.ModShift, a.cmdFindPrev),
+		nil,
+		a.cmds.spelling,
 	}}
 }
 
@@ -229,14 +233,14 @@ func (a *App) helpMenu() *menu {
 	}}
 }
 
-// contextItems returns the right-click menu: clipboard commands, then
-// insert or update the table of contents.
+// contextItems returns the right-click menu: corrections for a misspelt
+// word, clipboard commands, then insert or update the table of contents.
 func (a *App) contextItems() []*command {
 	toc := a.cmds.insertTOC
 	if a.hasTOC() {
 		toc = a.cmds.updateTOC
 	}
-	return []*command{a.cmds.cut, a.cmds.copy, a.cmds.paste, nil, toc}
+	return append(a.ctx.spellItems, a.cmds.cut, a.cmds.copy, a.cmds.paste, nil, toc)
 }
 
 func (a *App) hasTOC() bool {

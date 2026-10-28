@@ -19,6 +19,9 @@ type contextMenu struct {
 	open  bool
 	at    image.Point
 	popup popup
+	// spellItems are the corrections for the misspelt word right-clicked,
+	// if any, shown at the top.
+	spellItems []*command
 	// keepSel holds the editor selection across a right-click, which the
 	// editor would otherwise treat as a click that moves the caret.
 	keepSel *[2]int
@@ -28,6 +31,7 @@ type contextMenu struct {
 func (a *App) layout(gtx layout.Context) {
 	a.handleInput(gtx)
 	a.handleEditorEvents(gtx)
+	a.spell.handleClick(gtx)
 	a.handleRightClick(gtx)
 	a.updateTitle()
 	size := gtx.Constraints.Max
@@ -120,6 +124,10 @@ func (a *App) openContextMenu(at image.Point) {
 	a.ctx.open = true
 	a.ctx.at = at.Add(image.Pt(0, a.barH+a.toolH))
 	a.bar.open = -1
+	a.ctx.spellItems = nil
+	if m := a.spell.clicked; m != nil {
+		a.ctx.spellItems = a.spell.menuItems(*m)
+	}
 	s, e := a.editor.Selection()
 	a.ctx.keepSel = &[2]int{s, e}
 }

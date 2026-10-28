@@ -110,6 +110,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	e.LineHeightScale = 1.35
 	e.SelectionColor = col.selectColor
 	dims := e.Layout(gtx)
+	a.spell.underline(gtx, dims.Size)
 	a.find.highlight(gtx)
 	return dims
 }

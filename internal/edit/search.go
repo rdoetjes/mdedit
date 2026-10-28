@@ -107,3 +107,14 @@ func ReplaceAll(s State, q Query, repl string) (State, int) {
 	out = append(out, s.Text[last:]...)
 	return State{Text: out}, len(matches)
 }
+
+// ReplaceWord replaces text[start:end] with word and puts the caret after
+// it, if that part of the text still reads old; otherwise it changes
+// nothing.
+func ReplaceWord(s State, start, end int, old, word string) State {
+	if start < 0 || start > end || end > len(s.Text) || string(s.Text[start:end]) != old {
+		return s
+	}
+	caret := start + len([]rune(word))
+	return s.replace(start, end, word, caret, caret)
+}

@@ -71,6 +71,7 @@ type App struct {
 	regions     []widget.Region
 	ctx         contextMenu
 	find        findBar
+	spell       spellChecker
 	version     int // counts text changes, to know when to search again
 
 	dialog dialog
@@ -106,7 +107,9 @@ func New(path string) (*App, error) {
 	a.editor.WrapPolicy = text.WrapWords
 	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
 	a.find.init(a)
-	a.setDark(startDark(loadSettings()))
+	st := loadSettings()
+	a.setDark(startDark(st))
+	a.spell.init(a, st)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}
@@ -134,6 +137,7 @@ func (a *App) reparse() {
 	a.version++
 	a.doc = mdmodel.Parse([]byte(txt))
 	a.preview.SetDocument(a.doc)
+	a.spell.check(txt, a.doc)
 	a.dirty = txt != a.saved
 	a.words = countWords(txt)
 	a.autosave()
