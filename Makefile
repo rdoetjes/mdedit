@@ -14,7 +14,7 @@
 #   make deps       show the system packages needed to build
 #   make wasm       build the browser version into bin/web, plus its web
 #                   server bin/mdedit-web
-#   make serve      run bin/mdedit-web on http://localhost:8080
+#   make serve      run bin/mdedit-web on http://localhost:8089
 #   make install-jail   (sudo; FreeBSD) install the browser version and its
 #                   service into the jail at $(JAIL_ROOT)
 #
@@ -141,7 +141,7 @@ deps:
 # picker, downloads and localStorage. bin/web is everything a web server
 # needs; bin/mdedit-web is a small server for it (see cmd/mdedit-web).
 WEB  = bin/web
-PORT ?= 8080
+PORT ?= 8089
 # The server is built for this machine; to build it for the jail elsewhere:
 # make wasm SERVER_GOOS=freebsd SERVER_GOARCH=amd64
 SERVER_GOOS   ?=
@@ -195,4 +195,4 @@ install-jail:
 	else \
 		echo "The jail isn't running; the service starts with it."; \
 	fi
-	@echo "Installed. Port and HTTPS: sysrc -R $(JAIL_ROOT) mdedit_web_addr=:8080 mdedit_web_flags=…"
+	@echo "Installed. Port and HTTPS: sysrc -R $(JAIL_ROOT) mdedit_web_addr=:8089 mdedit_web_flags=…"

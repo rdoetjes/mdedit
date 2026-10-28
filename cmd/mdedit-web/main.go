@@ -2,7 +2,7 @@
 // small static file server that sends the right content types and the
 // pre-compressed copies (.br, .gz) of the large files.
 //
-//	mdedit-web -dir bin/web -addr :8080
+//	mdedit-web -dir bin/web -addr :8089
 //	mdedit-web -dir /usr/local/www/content_renderer -tls-cert c.pem -tls-key k.pem
 //
 // Browsers only allow the clipboard on HTTPS pages (and on localhost), so
@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	addrFlag = flag.String("addr", ":8080", "listen `address`")
+	addrFlag = flag.String("addr", ":8089", "listen `address`")
 	dirFlag  = flag.String("dir", ".", "`folder` with index.html, mdedit.wasm and wasm_exec.js")
 	certFlag = flag.String("tls-cert", "", "TLS certificate `file` (PEM); serves HTTPS with -tls-key")
 	keyFlag  = flag.String("tls-key", "", "TLS private key `file` (PEM)")

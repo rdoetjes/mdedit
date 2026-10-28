@@ -9,7 +9,7 @@
 # Settings for /etc/rc.conf (set them with sysrc):
 #
 #   mdedit_web_enable="YES"     start at boot (default NO)
-#   mdedit_web_addr=":8080"     listen address
+#   mdedit_web_addr=":8089"     listen address
 #   mdedit_web_dir="/usr/local/www/content_renderer"
 #                               folder with index.html and mdedit.wasm
 #   mdedit_web_user="www"       user the server runs as
@@ -25,7 +25,7 @@ rcvar="mdedit_web_enable"
 load_rc_config $name
 
 : ${mdedit_web_enable:="NO"}
-: ${mdedit_web_addr:=":8080"}
+: ${mdedit_web_addr:=":8089"}
 : ${mdedit_web_dir:="/usr/local/www/content_renderer"}
 : ${mdedit_web_user:="www"}
 : ${mdedit_web_flags:=""}

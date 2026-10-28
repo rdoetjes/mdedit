@@ -176,7 +176,7 @@ main one; the browser version is the same program compiled to WebAssembly,
 with a different way of reaching files.
 
     make wasm     # bin/web (the web page) and bin/mdedit-web (a small web server)
-    make serve    # try it on http://localhost:8080
+    make serve    # try it on http://localhost:8089
 
 `bin/web` holds `index.html`, `mdedit.wasm` (with compressed `.gz` and, if
 the `brotli` command exists, `.br` copies), Go's `wasm_exec.js` and the icon.
@@ -196,9 +196,9 @@ jail's `/usr/local/bin/mdedit-web`, and the service script to the jail's
 `/usr/local/etc/rc.d/mdedit_web`; it enables the service in the jail's
 `rc.conf` and, if the jail is running, (re)starts it. Override the
 locations with `JAIL_ROOT=…` and `WEBROOT=…`. The service listens on port
-8080 as user `www`; change it with:
+8089 as user `www`; change it with:
 
-    sudo sysrc -R /zroot/sylve/jails/100 mdedit_web_addr=":8080"
+    sudo sysrc -R /zroot/sylve/jails/100 mdedit_web_addr=":8089"
     sudo sysrc -R /zroot/sylve/jails/100 mdedit_web_flags="-tls-cert /usr/local/etc/ssl/mdedit.crt -tls-key /usr/local/etc/ssl/mdedit.key"
 
 and `service mdedit_web restart` inside the jail. Logs go to the jail's
@@ -208,7 +208,8 @@ and `service mdedit_web restart` inside the jail. Logs go to the jail's
 HTTPS (or on `localhost`). Over plain HTTP from another machine, copy and
 paste within mdedit won't work. Give `mdedit-web` a certificate
 (`-tls-cert`, `-tls-key`), or put it behind a web server or proxy that
-does HTTPS.
+does HTTPS. For Caddy, `assets/caddy/Caddyfile` is a ready site block
+(`markdown.phonax.com` → the jail's port 8089); fill in the jail's address.
 
 **What is different in the browser:**
 
@@ -255,6 +256,7 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     tools/glyphdump    prints how a character is stored in the font (see HOW_IT_WORKS.md §6)
     web/index.html     the web page around the browser version
     assets/freebsd     rc.d script for mdedit-web
+    assets/caddy       Caddy reverse-proxy site block for the browser version
 
 The preview and the PDF share `internal/render`, so both use the same layout.
 

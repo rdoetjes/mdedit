@@ -1643,6 +1643,10 @@ script runs the server under `daemon(8)` as user `www`, with its pid file
 in `/var/run/mdedit_web/` and its log in `/var/log/mdedit_web.log`, both
 created for that user before start (`mdedit_web_prestart`).
 
+Behind a reverse proxy that does HTTPS (`assets/caddy/Caddyfile` for
+Caddy), the proxy passes the compressed responses through unchanged; it
+needn't compress anything itself, so the Caddy block has no `encode`.
+
 ### 8.6 Adding something that touches the outside world
 
 If a new feature reads or writes files, runs programs, or opens
@@ -1965,7 +1969,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   the dark theme as `dark-*.png`) to PNG files.
   Add a scene in `ui/screenshot_test.go` when you add something visual.
 - **The browser version:** `make wasm && make serve`, then open
-  `http://localhost:8080`. The browser's developer tools (F12) show Go's
+  `http://localhost:8089`. The browser's developer tools (F12) show Go's
   panics and `println` output in the console.
 - **The UI test harness** (`ui/harness_test.go`) drives the real `App`
   through Gio's input router: `h.press(key, mods)`, `h.rightClick(x, y)`,
