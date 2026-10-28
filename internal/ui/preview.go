@@ -3,6 +3,7 @@ package ui
 import (
 	"image"
 	"math"
+	"sync/atomic"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
@@ -23,6 +24,10 @@ type Preview struct {
 	BaseDir string
 	// OnLink is called when a link is clicked.
 	OnLink func(url string)
+	// Invalidate asks for a new frame; it may be called from any goroutine.
+	Invalidate func()
+	// imagesChanged is set when a downloaded image arrives.
+	imagesChanged atomic.Bool
 
 	list   widget.List
 	cache  []*render.Layout
@@ -46,7 +51,7 @@ func NewPreview(shaper *text.Shaper) *Preview {
 		images: map[string]*imageEntry{},
 	}
 	p.list.Axis = layout.Vertical
-	p.ctx = render.Ctx{Theme: &render.Light, Measure: p.text.measure, ImageSize: p.imageSize}
+	p.ctx = render.Ctx{Theme: &render.Light, Measure: p.text.measure, ImageSize: p.imageSize, VideoControls: true}
 	return p
 }
 
@@ -98,7 +103,7 @@ func (p *Preview) measure(gtx layout.Context) {
 	p.contentW = max(min(p.width-2*p.pad-gtx.Dp(10), gtx.Dp(maxContentWidth)), gtx.Dp(100))
 	p.ox = float32((p.width - p.contentW) / 2)
 	em := float32(gtx.Sp(16))
-	if p.contentW != p.cacheW || em != p.cacheE {
+	if p.contentW != p.cacheW || em != p.cacheE || p.imagesChanged.Swap(false) {
 		p.cache = make([]*render.Layout, len(p.doc.Blocks))
 		p.cacheW, p.cacheE = p.contentW, em
 	}

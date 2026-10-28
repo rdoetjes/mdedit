@@ -83,6 +83,7 @@ type commands struct {
 	cut, copy, paste         *command
 	insertTOC, updateTOC     *command
 	find, replace            *command
+	video                    *command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -118,6 +119,7 @@ func (a *App) buildSharedCommands() {
 	c.paste = &command{label: "Paste", key: "V", native: true, run: a.paste}
 	c.insertTOC = a.editCommand("Table of Contents", "", 0, edit.InsertTOC)
 	c.updateTOC = newCommand("Update Table of Contents", "", 0, a.cmdUpdateTOC)
+	c.video = newCommand("YouTube Video…", "", 0, a.cmdVideo)
 	c.find = newCommand("Find…", "F", 0, a.cmdFind)
 	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
@@ -133,11 +135,12 @@ func (a *App) buildToolbar() {
 	c.numbered.icon = mustIcon(icons.EditorFormatListNumbered)
 	c.bullets.icon = mustIcon(icons.EditorFormatListBulleted)
 	c.table.icon = mustIcon(icons.EditorBorderAll)
+	c.video.icon = mustIcon(icons.AVVideoLibrary)
 	c.find.icon = mustIcon(icons.ActionSearch)
 	c.replace.icon = mustIcon(icons.ActionFindReplace)
 	// Groups are separated by nil.
 	a.toolbarCmds = []*command{c.bold, c.italic, c.underline, nil, c.left, c.center, c.right,
-		nil, c.numbered, c.bullets, c.table, nil, c.find, c.replace}
+		nil, c.numbered, c.bullets, c.table, c.video, nil, c.find, c.replace}
 }
 
 func (a *App) fileMenu() *menu {
@@ -202,6 +205,7 @@ func (a *App) insertMenu() *menu {
 		nil,
 		a.editCommand("Link", "K", 0, linkKind(false).apply),
 		a.editCommand("Image", "I", key.ModShift, linkKind(true).apply),
+		c.video,
 	}}
 }
 
@@ -287,6 +291,15 @@ func (a *App) selectAll(gtx layout.Context) {
 func (a *App) paste(gtx layout.Context) {
 	gtx.Execute(clipboard.ReadCmd{Tag: &a.editor})
 	gtx.Execute(key.FocusCmd{Tag: &a.editor})
+}
+
+func (a *App) cmdVideo(layout.Context) { a.dialog = NewVideoDialog(a.videoChosen) }
+
+func (a *App) videoChosen(id, title string) {
+	a.dialog = nil
+	if id != "" {
+		a.pendingEdit = videoLink{id, title}.apply
+	}
 }
 
 func (a *App) tableDialog() {

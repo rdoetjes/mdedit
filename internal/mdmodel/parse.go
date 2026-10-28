@@ -12,6 +12,8 @@ import (
 	east "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
+
+	"mdedit/internal/youtube"
 )
 
 var md = goldmark.New(
@@ -180,15 +182,33 @@ func (b *builder) heading(n *ast.Heading) {
 	b.emit(n, blk, false)
 }
 
-// paragraph converts a paragraph; one consisting of a single image becomes
-// an image block.
+// paragraph converts a paragraph; one consisting of a single image, or of
+// a link around a single image, becomes an image block.
 func (b *builder) paragraph(n ast.Node) {
 	_, tight := n.(*ast.TextBlock)
-	if img, ok := n.FirstChild().(*ast.Image); ok && n.ChildCount() == 1 {
-		b.emit(n, Block{Kind: Image, Src: string(img.Destination), Alt: plainText(img, b.src)}, tight)
+	if img, link, ok := soleImage(n); ok {
+		blk := Block{Kind: Image, Src: string(img.Destination), Alt: plainText(img, b.src), Link: link}
+		blk.Video = link != "" && youtube.IsVideoLink(link)
+		b.emit(n, blk, tight)
 		return
 	}
 	b.emit(n, Block{Kind: Paragraph, Spans: b.inlines(n)}, tight)
+}
+
+// soleImage returns the image a paragraph consists of, and the target of
+// the link around it, if any.
+func soleImage(n ast.Node) (*ast.Image, string, bool) {
+	if n.ChildCount() != 1 {
+		return nil, "", false
+	}
+	switch c := n.FirstChild().(type) {
+	case *ast.Image:
+		return c, "", true
+	case *ast.Link:
+		img, ok := c.FirstChild().(*ast.Image)
+		return img, string(c.Destination), ok && c.ChildCount() == 1
+	}
+	return nil, "", false
 }
 
 func (b *builder) fencedCode(n *ast.FencedCodeBlock) {

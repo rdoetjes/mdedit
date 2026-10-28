@@ -74,6 +74,29 @@ and the convention markdown-toc and VS Code use). Right-click in the editor
 or preview and choose Update Table of Contents to regenerate it after
 editing headings; the right-click menu also has Cut, Copy and Paste.
 
+### YouTube videos
+
+Videos use GitHub's notation, a link around the video's still:
+
+    [![Video Title](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
+
+Insert → YouTube Video… (or the toolbar button) asks for the video ID — a
+full YouTube link works too — and an optional title. The preview shows the
+still at 66% of the width with a play button; clicking it opens the video in
+the browser. PDFs show just the still, linked to the video.
+
+Stills are downloaded in the background and cached in `~/.cache/mdedit/images`
+(`~/Library/Caches/mdedit/images` on macOS). Only YouTube stills are fetched,
+never other remote images; when a video has no full-resolution still,
+YouTube's standard one is used.
+
+Example me covering the Trooper: 
+<div align="center">
+
+[![The Trooper](https://img.youtube.com/vi/XIiJa9yDecU/maxresdefault.jpg)](https://www.youtube.com/watch?v=XIiJa9yDecU)
+
+</div>
+
 ### Maths
 
 Display maths goes between `$$` lines (or ` ```math ` fences, as on GitHub);
@@ -147,6 +170,8 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/pdfout    PDF painter with page breaking (fpdf)
     internal/edit      formatting commands as pure functions on text + selection
     internal/tex       TeX maths typesetter (embedded STIX Two Math)
+    internal/youtube   YouTube URLs and video IDs
+    internal/imgcache  downloads and caches YouTube stills
     internal/lint      code-style test: no anonymous functions, ≤4 indent levels, ≤40-line functions
     tools/mkicon       draws the application icon
 

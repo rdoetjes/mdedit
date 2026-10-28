@@ -93,6 +93,7 @@ func New(path string) (*App, error) {
 	a.buildCommands()
 	a.preview = NewPreview(shaper)
 	a.preview.OnLink = a.followLink
+	a.preview.Invalidate = a.invalidate
 	a.editor.WrapPolicy = text.WrapWords
 	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
 	a.find.init(a)
@@ -226,6 +227,13 @@ func (a *App) updateTitle() {
 	if t != a.title && a.win != nil {
 		a.title = t
 		a.win.Option(app.Title(t))
+	}
+}
+
+// invalidate asks the window for a new frame.
+func (a *App) invalidate() {
+	if a.win != nil {
+		a.win.Invalidate()
 	}
 }
 

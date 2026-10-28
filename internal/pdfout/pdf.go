@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-pdf/fpdf"
 
+	"mdedit/internal/imgcache"
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
 )
@@ -85,8 +86,14 @@ func newExporter(opt Options) *exporter {
 	return e
 }
 
-// imageSize reports the size of an image the PDF can embed.
+// imageSize reports the size of an image the PDF can embed. YouTube stills
+// are downloaded first if needed.
 func (e *exporter) imageSize(src string) (int, int, bool) {
+	if imgcache.Allowed(src) {
+		if _, err := imgcache.Get(src); err != nil {
+			return 0, 0, false
+		}
+	}
 	p, ok := render.ResolveImage(e.base, src)
 	if !ok || !supportedImage(p) {
 		return 0, 0, false

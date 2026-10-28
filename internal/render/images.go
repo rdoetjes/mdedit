@@ -10,12 +10,18 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"mdedit/internal/imgcache"
 )
 
 // ResolveImage maps an image reference from a document in baseDir to a local
-// file path. Remote images are not supported.
+// file path. Of remote images only YouTube stills are supported; they
+// resolve to their downloaded copy once package imgcache has fetched them.
 func ResolveImage(baseDir, src string) (string, bool) {
-	if i := strings.Index(src, "://"); i >= 0 {
+	if imgcache.Allowed(src) {
+		return imgcache.Path(src)
+	}
+	if strings.Contains(src, "://") {
 		if !strings.HasPrefix(src, "file://") {
 			return "", false
 		}

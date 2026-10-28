@@ -34,3 +34,22 @@ func spanText(s []Span) string {
 	}
 	return out
 }
+
+func TestVideoLink(t *testing.T) {
+	src := "[![My talk](https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n" +
+		"[![Logo](logo.png)](https://example.com)\n\nText [![x](y.png)](z) inline.\n"
+	doc := Parse([]byte(src))
+	if len(doc.Blocks) != 3 {
+		t.Fatalf("got %d blocks", len(doc.Blocks))
+	}
+	v := doc.Blocks[0]
+	if v.Kind != Image || !v.Video || v.Alt != "My talk" || v.Link != "https://www.youtube.com/watch?v=dQw4w9WgXcQ" {
+		t.Errorf("video block: %+v", v)
+	}
+	if l := doc.Blocks[1]; l.Kind != Image || l.Video || l.Link != "https://example.com" {
+		t.Errorf("linked image: %+v", l)
+	}
+	if doc.Blocks[2].Kind != Paragraph {
+		t.Errorf("image link inside text should stay inline: %+v", doc.Blocks[2])
+	}
+}

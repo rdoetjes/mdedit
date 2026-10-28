@@ -49,6 +49,10 @@ type linkKind bool // true for images
 
 func (k linkKind) apply(s edit.State) edit.State { return edit.Link(s, bool(k)) }
 
+type videoLink struct{ id, title string }
+
+func (v videoLink) apply(s edit.State) edit.State { return edit.Video(s, v.id, v.title) }
+
 type tableSize struct{ cols, rows int }
 
 func (t tableSize) apply(s edit.State) edit.State { return edit.Table(s, t.cols, t.rows) }

@@ -95,8 +95,11 @@ type Block struct {
 	Lang  string // code block language
 	Decor []Decor
 	Table *TableData
-	// Image blocks.
+	// Image blocks. Link is set for a linked image; Video when that link
+	// plays a YouTube video (GitHub's way of embedding videos).
 	Src, Alt string
+	Link     string
+	Video    bool
 	// ID is the heading anchor ("#overview").
 	ID string
 	// Line is the 0-based source line the block starts on.

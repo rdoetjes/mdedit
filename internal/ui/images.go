@@ -6,6 +6,7 @@ import (
 
 	"gioui.org/op/paint"
 
+	"mdedit/internal/imgcache"
 	"mdedit/internal/render"
 )
 
@@ -19,10 +20,13 @@ type imageEntry struct {
 }
 
 // image returns the decoded image referenced by src, or nil if it can't be
-// shown.
+// shown (yet: a YouTube still is downloaded in the background first).
 func (p *Preview) image(src string) *imageEntry {
 	path, ok := render.ResolveImage(p.BaseDir, src)
 	if !ok {
+		if imgcache.Allowed(src) {
+			imgcache.Fetch(src, p.imageArrived)
+		}
 		return nil
 	}
 	st, err := os.Stat(path)
@@ -46,6 +50,15 @@ func (p *Preview) cachedImage(path string, mod int64) *imageEntry {
 	e.mod = mod
 	p.images[path] = e
 	return e
+}
+
+// imageArrived runs when a background download finishes: lay out again
+// with the new image.
+func (p *Preview) imageArrived() {
+	p.imagesChanged.Store(true)
+	if p.Invalidate != nil {
+		p.Invalidate()
+	}
 }
 
 func decodeImage(path string) *imageEntry {

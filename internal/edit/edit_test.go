@@ -206,3 +206,11 @@ func TestTOCMarkersInText(t *testing.T) {
 		t.Errorf("update with mentions:\n%s", upd)
 	}
 }
+
+func TestVideo(t *testing.T) {
+	got := Video(st(t, "Intro|"), "dQw4w9WgXcQ", "Talk").String()
+	want := "Intro\n\n[![Talk](https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n"
+	if got != want {
+		t.Errorf("got %q", got)
+	}
+}

@@ -6,9 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"gioui.org/gpu/headless"
 	"gioui.org/io/key"
+	"gioui.org/layout"
+
+	"mdedit/internal/imgcache"
+	"mdedit/internal/mdmodel"
 )
 
 // TestScreenshot renders the window offscreen to PNG files. Set MDEDIT_SHOT
@@ -111,12 +116,48 @@ func (s *shooter) contentScenes() {
 		s.scene("maths.png", string(src))
 		s.h.a.view = viewSplit
 	}
+	s.videoScenes()
 	s.h.setText(tocSample, 0, 0)
 	s.h.run(s.h.a.cmds.insertTOC)
 	s.h.a.preview.ScrollToBlock(0)
 	s.h.rightClick(700, 700)
 	s.shot("toc.png")
 	s.h.a.ctx.open = false
+}
+
+// videoScenes shows YouTube stills in the preview (downloading them if
+// needed) and the Insert Video dialog.
+func (s *shooter) videoScenes() {
+	src, err := os.ReadFile("../mdmodel/testdata/videos.md")
+	if err != nil {
+		s.h.t.Fatal(err)
+	}
+	s.h.setText(string(src), 0, 0)
+	s.h.a.preview.ScrollToBlock(0)
+	s.waitForImages(string(src))
+	s.shot("videos.png")
+	s.h.a.cmdVideo(layout.Context{})
+	s.shot("dialog-video.png")
+	s.h.a.dialog = nil
+}
+
+// waitForImages gives background downloads of the document's YouTube
+// stills up to 10 seconds.
+func (s *shooter) waitForImages(doc string) {
+	deadline := time.Now().Add(10 * time.Second)
+	for !s.imagesCached(doc) && time.Now().Before(deadline) {
+		s.h.frame()
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func (s *shooter) imagesCached(doc string) bool {
+	for _, b := range mdmodel.Parse([]byte(doc)).Blocks {
+		if _, ok := imgcache.Path(b.Src); b.Video && !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // scene shows a document from the top and saves a screenshot.

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"mdedit/internal/youtube"
 )
 
 // State is a text with a selection. Start <= End; they are equal when there
@@ -348,4 +350,12 @@ func MathBlock(s State) State {
 		return s.replace(from, to, block, from+3, from+3+len([]rune(body)))
 	}
 	return ownLine(s, "$$\n\n$$", 3, 3)
+}
+
+// Video inserts a GitHub-style YouTube video link on its own line: the
+// video's still, linking to the video.
+func Video(s State, id, title string) State {
+	block := youtube.Markdown(id, title)
+	n := len([]rune(block))
+	return ownLine(s, block, n, n)
 }

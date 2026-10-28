@@ -34,6 +34,9 @@ type Ctx struct {
 	// resolved relative to the document. ok is false for images that can't
 	// be shown.
 	ImageSize func(src string) (w, h int, ok bool)
+	// VideoControls draws a play button on video stills, and a placeholder
+	// while a still is loading (for the preview; PDFs show just the image).
+	VideoControls bool
 	// MaxImageHeight limits image height (for example to fit a PDF page).
 	// Zero means no limit.
 	MaxImageHeight float32
@@ -206,39 +209,6 @@ func (c *Ctx) code(b *mdmodel.Block, w float32) (*Layout, float32) {
 	l.Prims = append(l.Prims, Prim{Kind: PRect, W: w, H: l.Height, Radius: 0.375 * em, Color: c.Theme.CodeBg})
 	c.emitLines(l, items, lines, pad, pad, w-2*pad, mdmodel.AlignNone, true)
 	return l, pad + firstBaseline(lines, size)
-}
-
-func (c *Ctx) image(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, float32) {
-	pw, ph, ok := 0, 0, false
-	if c.ImageSize != nil {
-		pw, ph, ok = c.ImageSize(b.Src)
-	}
-	if !ok || pw == 0 || ph == 0 {
-		alt := b.Alt
-		if alt == "" {
-			alt = b.Src
-		}
-		return c.paragraph([]mdmodel.Span{{Text: "[image: " + alt + "]", Italic: true, Link: b.Src}}, w, col, b.Align)
-	}
-	// Treat image pixels as CSS pixels: 16 per em.
-	iw := float32(pw) * c.Em / 16
-	ih := float32(ph) * c.Em / 16
-	if iw > w {
-		ih *= w / iw
-		iw = w
-	}
-	if c.MaxImageHeight > 0 && ih > c.MaxImageHeight {
-		iw *= c.MaxImageHeight / ih
-		ih = c.MaxImageHeight
-	}
-	x := float32(0)
-	switch b.Align {
-	case mdmodel.AlignCenter:
-		x = (w - iw) / 2
-	case mdmodel.AlignRight:
-		x = w - iw
-	}
-	return &Layout{Height: ih, Prims: []Prim{{Kind: PImage, X: x, W: iw, H: ih, URL: b.Src}}}, min(ih, c.Em)
 }
 
 func firstBaseline(lines []line, size float32) float32 {
