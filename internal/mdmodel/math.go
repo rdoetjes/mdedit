@@ -100,8 +100,8 @@ func (mathBlockParser) Continue(n ast.Node, reader text.Reader, pc parser.Contex
 }
 
 func (mathBlockParser) Close(ast.Node, text.Reader, parser.Context) {}
-func (mathBlockParser) CanInterruptParagraph() bool            { return true }
-func (mathBlockParser) CanAcceptIndentedLine() bool            { return false }
+func (mathBlockParser) CanInterruptParagraph() bool                 { return true }
+func (mathBlockParser) CanAcceptIndentedLine() bool                 { return false }
 
 type mathInlineParser struct{}
 

@@ -3,7 +3,6 @@ package ui
 
 import (
 	"fmt"
-	"image"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,24 +10,16 @@ import (
 	"unicode"
 
 	"gioui.org/app"
-	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/gesture"
-	"gioui.org/io/event"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
 	"mdedit/internal/edit"
 	"mdedit/internal/mdmodel"
-	"mdedit/internal/pdfout"
 )
 
 type viewMode int
@@ -68,27 +59,22 @@ type App struct {
 	drag      gesture.Drag
 	dragStart float32
 
+	cmds        commands
 	menus       []*menu
 	toolbarCmds []*command
+	shortcuts   []*command
 	bar         menuBar
+	barH, toolH int
 	hint        string // status bar text while hovering a toolbar button
 	regions     []widget.Region
-
-	// Context menu.
-	cutCmd, copyCmd, pasteCmd *command
-	insertTOC, updateTOC      *command
-	ctxTag                    int
-	ctxOpen                   bool
-	ctxAt                     image.Point
-	ctxPopup                  popup
-	bodyTop                   int // window y of the editor/preview area
-	// keepSel holds the editor selection across a right-click, which the
-	// editor would otherwise treat as a click that moves the caret.
-	keepSel *[2]int
+	ctx         contextMenu
 
 	dialog dialog
-	// pending runs on the next frame; used for edits requested from dialogs.
-	pending func(gtx layout.Context)
+	flow   flow
+	// pendingEdit and pendingCmd run on the next frame; they are requested
+	// by dialogs, which have no layout context.
+	pendingEdit editFunc
+	pendingCmd  *command
 }
 
 // Version is shown in the About box.
@@ -106,27 +92,32 @@ func New(path string) (*App, error) {
 	a.preview = NewPreview(shaper)
 	a.preview.OnLink = a.followLink
 	a.editor.WrapPolicy = text.WrapWords
-
-	if path != "" {
-		abs, err := filepath.Abs(path)
-		if err == nil {
-			path = abs
-		}
-		data, err := os.ReadFile(path)
-		switch {
-		case err == nil:
-			a.load(path, string(data))
-		case os.IsNotExist(err):
-			a.load("", "")
-			a.path = path
-			a.preview.BaseDir = filepath.Dir(path)
-		default:
-			return nil, err
-		}
-	} else {
-		a.load("", "")
+	if err := a.loadInitial(path); err != nil {
+		return nil, err
 	}
 	return a, nil
+}
+
+func (a *App) loadInitial(path string) error {
+	if path == "" {
+		a.load("", "")
+		return nil
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	data, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		a.load(path, string(data))
+	case os.IsNotExist(err):
+		a.load("", "")
+		a.path = path
+		a.preview.BaseDir = filepath.Dir(path)
+	default:
+		return err
+	}
+	return nil
 }
 
 func (a *App) load(path, content string) {
@@ -139,11 +130,7 @@ func (a *App) load(path, content string) {
 	a.saved = content
 	a.editor.SetText(content)
 	a.editor.SetCaret(0, 0)
-	if path != "" {
-		a.preview.BaseDir = filepath.Dir(path)
-	} else {
-		a.preview.BaseDir, _ = os.Getwd()
-	}
+	a.preview.BaseDir = a.dir()
 	a.reparse()
 	a.preview.ScrollToBlock(0)
 	a.lastRow = -1
@@ -159,14 +146,13 @@ func (a *App) reparse() {
 
 func countWords(s string) int {
 	n := 0
-	in := false
+	inWord := false
 	for _, r := range s {
-		if unicode.IsSpace(r) {
-			in = false
-		} else if !in {
-			in = true
+		space := unicode.IsSpace(r)
+		if !space && !inWord {
 			n++
 		}
+		inWord = !space
 	}
 	return n
 }
@@ -198,25 +184,29 @@ func (a *App) saveRecovery() {
 	if !a.dirty {
 		return
 	}
+	p, err := a.recoveryPath()
+	if err == nil {
+		err = os.WriteFile(p, []byte(a.editor.Text()), 0o600)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mdedit: could not save unsaved changes:", err)
+		return
+	}
+	fmt.Fprintln(os.Stderr, "mdedit: unsaved changes written to", p)
+}
+
+// recoveryPath returns a new file name in the user's cache folder.
+func (a *App) recoveryPath() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = os.TempDir()
 	}
 	dir = filepath.Join(dir, "mdedit")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		fmt.Fprintln(os.Stderr, "mdedit: could not save unsaved changes:", err)
-		return
+		return "", err
 	}
-	name := "untitled"
-	if a.path != "" {
-		name = strings.TrimSuffix(filepath.Base(a.path), filepath.Ext(a.path))
-	}
-	p := filepath.Join(dir, fmt.Sprintf("%s-%s.md", name, time.Now().Format("20060102-150405")))
-	if err := os.WriteFile(p, []byte(a.editor.Text()), 0o600); err != nil {
-		fmt.Fprintln(os.Stderr, "mdedit: could not save unsaved changes:", err)
-		return
-	}
-	fmt.Fprintln(os.Stderr, "mdedit: unsaved changes written to", p)
+	stamp := time.Now().Format("20060102-150405")
+	return filepath.Join(dir, fmt.Sprintf("%s-%s.md", a.baseName(), stamp)), nil
 }
 
 func (a *App) updateTitle() {
@@ -234,8 +224,7 @@ func (a *App) updateTitle() {
 	}
 }
 
-// File operations.
-
+// dir is the folder of the document, or the working directory.
 func (a *App) dir() string {
 	if a.path != "" {
 		return filepath.Dir(a.path)
@@ -249,444 +238,4 @@ func (a *App) baseName() string {
 		return "untitled"
 	}
 	return strings.TrimSuffix(filepath.Base(a.path), filepath.Ext(a.path))
-}
-
-// confirmDiscard runs then, after asking to save unsaved changes first.
-func (a *App) confirmDiscard(then func()) {
-	if !a.dirty {
-		then()
-		return
-	}
-	a.dialog = &ConfirmDialog{
-		Message: "The document has unsaved changes. Save them first?",
-		Buttons: []string{"Cancel", "Don't save", "Save"},
-		Done: func(choice int) {
-			a.dialog = nil
-			switch choice {
-			case 1:
-				a.dirty = false
-				then()
-			case 2:
-				a.save(then)
-			}
-		},
-	}
-}
-
-func (a *App) newDoc() {
-	a.confirmDiscard(func() {
-		a.load("", "")
-		a.setStatus("New document")
-	})
-}
-
-func (a *App) openDialog() {
-	a.confirmDiscard(func() {
-		a.dialog = NewFileDialog("Open Markdown file", a.dir(), "", false, mdExts, func(p string) {
-			a.dialog = nil
-			if p != "" {
-				a.openFile(p)
-			}
-		})
-	})
-}
-
-func (a *App) openFile(p string) {
-	data, err := os.ReadFile(p)
-	if err != nil {
-		a.setStatus("Open failed: %v", err)
-		return
-	}
-	a.load(p, string(data))
-	a.setStatus("Opened %s", p)
-}
-
-// save writes the document, asking for a name if it has none, and runs then
-// on success.
-func (a *App) save(then func()) {
-	if a.path == "" {
-		a.saveAs(then)
-		return
-	}
-	a.writeFile(a.path, then)
-}
-
-func (a *App) saveAs(then func()) {
-	a.dialog = NewFileDialog("Save Markdown file", a.dir(), a.baseName()+".md", true, mdExts[:1], func(p string) {
-		a.dialog = nil
-		if p == "" {
-			return
-		}
-		a.confirmOverwrite(p, p != a.path, func() { a.writeFile(p, then) })
-	})
-}
-
-func (a *App) confirmOverwrite(p string, ask bool, then func()) {
-	if _, err := os.Stat(p); err != nil || !ask {
-		then()
-		return
-	}
-	a.dialog = &ConfirmDialog{
-		Message: filepath.Base(p) + " already exists. Replace it?",
-		Buttons: []string{"Cancel", "Replace"},
-		Done: func(choice int) {
-			a.dialog = nil
-			if choice == 1 {
-				then()
-			}
-		},
-	}
-}
-
-func (a *App) writeFile(p string, then func()) {
-	txt := a.editor.Text()
-	if err := os.WriteFile(p, []byte(txt), 0o644); err != nil {
-		a.setStatus("Save failed: %v", err)
-		return
-	}
-	a.path = p
-	a.saved = txt
-	a.dirty = false
-	a.preview.BaseDir = filepath.Dir(p)
-	a.setStatus("Saved %s", p)
-	if then != nil {
-		then()
-	}
-}
-
-func (a *App) exportDialog() {
-	a.dialog = NewFileDialog("Export PDF", a.dir(), a.baseName()+".pdf", true, []string{".pdf"}, func(p string) {
-		a.dialog = nil
-		if p == "" {
-			return
-		}
-		a.confirmOverwrite(p, true, func() { a.exportPDF(p) })
-	})
-}
-
-func (a *App) exportPDF(p string) {
-	f, err := os.Create(p)
-	if err != nil {
-		a.setStatus("Export failed: %v", err)
-		return
-	}
-	err = pdfout.Write(f, a.doc, pdfout.Options{BaseDir: a.preview.BaseDir, Title: a.baseName()})
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		a.setStatus("Export failed: %v", err)
-		return
-	}
-	a.setStatus("Exported %s", p)
-}
-
-func (a *App) followLink(url string) {
-	switch {
-	case strings.HasPrefix(url, "#"):
-		if i := a.doc.HeadingIndex(url[1:]); i >= 0 {
-			a.preview.ScrollToBlock(i)
-		} else {
-			a.setStatus("No heading with anchor %s", url)
-		}
-	case strings.Contains(url, ":"):
-		if err := openURL(url); err != nil {
-			a.setStatus("Could not open %s: %v", url, err)
-		}
-	default:
-		// A relative link: open Markdown files here, anything else externally.
-		p := url
-		if i := strings.IndexByte(p, '#'); i >= 0 {
-			p = p[:i]
-		}
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(a.preview.BaseDir, p)
-		}
-		if _, err := os.Stat(p); err != nil {
-			a.setStatus("Link target not found: %s", url)
-			return
-		}
-		ext := strings.ToLower(filepath.Ext(p))
-		for _, x := range mdExts {
-			if ext == x {
-				a.confirmDiscard(func() { a.openFile(p) })
-				return
-			}
-		}
-		if err := openURL(p); err != nil {
-			a.setStatus("Could not open %s: %v", p, err)
-		}
-	}
-}
-
-func (a *App) quit() {
-	a.confirmDiscard(func() {
-		a.dirty = false
-		a.win.Perform(system.ActionClose)
-	})
-}
-
-// Layout.
-
-func (a *App) layout(gtx layout.Context) {
-	if a.dialog == nil {
-		if a.bar.open < 0 {
-			a.handleShortcuts(gtx)
-		}
-		// These keys must be handled before the editor sees them.
-		a.handleEnter(gtx)
-		a.handleTab(gtx)
-		a.handleMacKeys(gtx)
-		for _, c := range a.toolbarCmds {
-			if c != nil && c.click.Clicked(gtx) {
-				c.run(gtx)
-			}
-		}
-		if p := a.pending; p != nil {
-			a.pending = nil
-			p(gtx)
-		}
-	}
-	for {
-		ev, ok := a.editor.Update(gtx)
-		if !ok {
-			break
-		}
-		if _, ok := ev.(widget.ChangeEvent); ok {
-			if strings.ContainsRune(a.editor.Text(), '\t') {
-				a.applyEdit(gtx, edit.ExpandTabs) // pasted text
-			}
-			a.reparse()
-		}
-	}
-	a.updateTitle()
-
-	// Right-click in the editor or preview opens the context menu.
-	for {
-		ev, ok := gtx.Event(pointer.Filter{Target: &a.ctxTag, Kinds: pointer.Press})
-		if !ok {
-			break
-		}
-		if e, ok := ev.(pointer.Event); ok && e.Buttons.Contain(pointer.ButtonSecondary) && a.dialog == nil {
-			a.ctxOpen = true
-			a.ctxAt = image.Pt(int(e.Position.X), int(e.Position.Y)+a.bodyTop)
-			a.bar.open = -1
-			s, e := a.editor.Selection()
-			a.keepSel = &[2]int{s, e}
-		}
-	}
-
-	size := gtx.Constraints.Max
-	var barH, toolH int
-	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			d := a.bar.Layout(gtx, a.th, a.menus, a.dialog == nil)
-			barH = d.Size.Y
-			return d
-		}),
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			d := a.toolbar(gtx)
-			toolH = d.Size.Y
-			return d
-		}),
-		layout.Flexed(1, a.body),
-		layout.Rigid(a.statusBar),
-	)
-	a.bodyTop = barH + toolH
-	if a.keepSel != nil {
-		a.editor.SetCaret(a.keepSel[0], a.keepSel[1])
-		a.keepSel = nil
-	}
-	gtx.Constraints = layout.Exact(size)
-	switch {
-	case a.dialog != nil:
-		a.ctxOpen = false
-		a.dialog.Layout(gtx, a.th)
-	case a.ctxOpen:
-		chosen, closed := a.ctxPopup.Layout(gtx, a.th, a.contextItems(), a.ctxAt, image.Rectangle{})
-		if closed {
-			a.ctxOpen = false
-		}
-		if chosen != nil {
-			chosen.run(gtx)
-		}
-	default:
-		a.bar.Overlay(gtx, a.th, a.menus)
-	}
-}
-
-func (a *App) toolbar(gtx layout.Context) layout.Dimensions {
-	a.hint = ""
-	return layout.Background{}.Layout(gtx,
-		func(gtx layout.Context) layout.Dimensions {
-			sz := gtx.Constraints.Min
-			paint.FillShape(gtx.Ops, toolbarBg, clip.Rect{Max: sz}.Op())
-			paint.FillShape(gtx.Ops, dividerCol, clip.Rect{Min: image.Pt(0, sz.Y-1), Max: sz}.Op())
-			return layout.Dimensions{Size: sz}
-		},
-		func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Top: 3, Bottom: 4, Left: 8, Right: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				var children []layout.FlexChild
-				for _, c := range a.toolbarCmds {
-					if c == nil {
-						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							w, h := gtx.Dp(17), gtx.Dp(30)
-							paint.FillShape(gtx.Ops, dividerCol, clip.Rect{Min: image.Pt(w/2, gtx.Dp(5)), Max: image.Pt(w/2+1, h-gtx.Dp(5))}.Op())
-							return layout.Dimensions{Size: image.Pt(w, h)}
-						}))
-						continue
-					}
-					children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						if c.click.Hovered() {
-							a.hint = c.tooltip()
-						}
-						return layout.Inset{Right: 2}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							return iconButton(gtx, &c.click, c.icon)
-						})
-					}))
-				}
-				children = append(children, layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-					name := "Untitled"
-					if a.path != "" {
-						name = a.path
-					}
-					if a.dirty {
-						name += "  •"
-					}
-					l := material.Body2(a.th, name)
-					l.Color = statusFg
-					l.MaxLines = 1
-					l.Alignment = text.End
-					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					return l.Layout(gtx)
-				}))
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
-			})
-		})
-}
-
-func (a *App) statusBar(gtx layout.Context) layout.Dimensions {
-	return layout.Background{}.Layout(gtx,
-		func(gtx layout.Context) layout.Dimensions {
-			sz := gtx.Constraints.Min
-			paint.FillShape(gtx.Ops, toolbarBg, clip.Rect{Max: sz}.Op())
-			paint.FillShape(gtx.Ops, dividerCol, clip.Rect{Max: image.Pt(sz.X, 1)}.Op())
-			return layout.Dimensions{Size: sz}
-		},
-		func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Top: 4, Bottom: 4, Left: 10, Right: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				msg := a.status
-				if a.hint != "" {
-					msg = a.hint
-				} else if msg == "" || time.Since(a.statusTime) > 8*time.Second {
-					msg = "Ctrl+O open · Ctrl+S save · Ctrl+E export PDF · Ctrl+/ switch view"
-					if key.ModShortcut == key.ModCommand {
-						msg = strings.ReplaceAll(msg, "Ctrl+", "⌘")
-					}
-				} else {
-					gtx.Execute(op.InvalidateCmd{At: a.statusTime.Add(8 * time.Second)})
-				}
-				row, col := a.editor.CaretPos()
-				pos := fmt.Sprintf("Ln %d, Col %d · %d words", row+1, col+1, a.words)
-				return layout.Flex{}.Layout(gtx,
-					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-						l := material.Caption(a.th, msg)
-						l.Color = statusFg
-						l.MaxLines = 1
-						return l.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						l := material.Caption(a.th, pos)
-						l.Color = statusFg
-						return l.Layout(gtx)
-					}),
-				)
-			})
-		})
-}
-
-func (a *App) body(gtx layout.Context) layout.Dimensions {
-	dims := a.panes(gtx)
-	// Watch for right-clicks over both panes, letting the events through to
-	// the editor and preview as well.
-	area := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	pass := pointer.PassOp{}.Push(gtx.Ops)
-	event.Op(gtx.Ops, &a.ctxTag)
-	pass.Pop()
-	area.Pop()
-	return dims
-}
-
-func (a *App) panes(gtx layout.Context) layout.Dimensions {
-	size := gtx.Constraints.Max
-	switch a.view {
-	case viewEditor:
-		return a.editorPane(gtx)
-	case viewPreview:
-		return a.preview.Layout(gtx, a.th)
-	}
-
-	divW := gtx.Dp(6)
-	// Dragging the divider resizes the panes.
-	for {
-		ev, ok := a.drag.Update(gtx.Metric, gtx.Source, gesture.Horizontal)
-		if !ok {
-			break
-		}
-		switch ev.Kind {
-		case pointer.Press:
-			a.dragStart = ev.Position.X
-		case pointer.Drag:
-			a.split += (ev.Position.X - a.dragStart) / float32(size.X)
-			a.split = min(max(a.split, 0.15), 0.85)
-		}
-	}
-	leftW := int(a.split * float32(size.X))
-
-	gtx1 := gtx
-	gtx1.Constraints = layout.Exact(image.Pt(leftW, size.Y))
-	a.editorPane(gtx1)
-
-	st := op.Offset(image.Pt(leftW, 0)).Push(gtx.Ops)
-	div := image.Rect(0, 0, divW, size.Y)
-	paint.FillShape(gtx.Ops, toolbarBg, clip.Rect(div).Op())
-	paint.FillShape(gtx.Ops, dividerCol, clip.Rect(image.Rect(divW/2, 0, divW/2+1, size.Y)).Op())
-	area := clip.Rect(div).Push(gtx.Ops)
-	pointer.CursorColResize.Add(gtx.Ops)
-	a.drag.Add(gtx.Ops)
-	area.Pop()
-	st.Pop()
-
-	st = op.Offset(image.Pt(leftW+divW, 0)).Push(gtx.Ops)
-	gtx2 := gtx
-	gtx2.Constraints = layout.Exact(image.Pt(size.X-leftW-divW, size.Y))
-	a.preview.Layout(gtx2, a.th)
-	st.Pop()
-	return layout.Dimensions{Size: size}
-}
-
-func (a *App) editorPane(gtx layout.Context) layout.Dimensions {
-	paint.FillShape(gtx.Ops, editorBg, clip.Rect{Max: gtx.Constraints.Max}.Op())
-	if a.dialog == nil && !gtx.Focused(&a.editor) && a.lastRow < 0 {
-		gtx.Execute(key.FocusCmd{Tag: &a.editor})
-	}
-	dims := layout.Inset{Top: 12, Bottom: 12, Left: 14, Right: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		gtx.Constraints.Min = gtx.Constraints.Max
-		e := material.Editor(a.th, &a.editor, "Start writing Markdown…")
-		e.Font = font.Font{Typeface: "Go Mono"}
-		e.TextSize = 14
-		e.LineHeightScale = 1.35
-		e.SelectionColor = selectColor
-		return e.Layout(gtx)
-	})
-	// Keep the preview following the caret.
-	if row, _ := a.editor.CaretPos(); row != a.lastRow {
-		if a.lastRow >= 0 && a.view == viewSplit {
-			a.preview.EnsureVisible(a.doc.BlockAtLine(row))
-		}
-		a.lastRow = row
-	}
-	return dims
 }

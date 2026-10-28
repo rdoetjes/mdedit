@@ -1,0 +1,116 @@
+package ui
+
+import (
+	"image"
+	"image/png"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"gioui.org/gpu/headless"
+)
+
+// TestScreenshot renders the window offscreen to PNG files. Set MDEDIT_SHOT
+// to a directory to run it; it is for checking the UI without a display.
+func TestScreenshot(t *testing.T) {
+	dir := os.Getenv("MDEDIT_SHOT")
+	if dir == "" {
+		t.Skip("MDEDIT_SHOT not set")
+	}
+	h := newHarness(t, "../mdmodel/testdata/TEST.md")
+	w, err := headless.NewWindow(h.size.X, h.size.Y)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &shooter{h: h, w: w, dir: dir}
+	s.previewScenes()
+	s.overlayScenes()
+	s.contentScenes()
+}
+
+// shooter saves screenshots of the harness's window.
+type shooter struct {
+	h   *harness
+	w   *headless.Window
+	dir string
+}
+
+func (s *shooter) shot(name string) {
+	for i := 0; i < 3; i++ {
+		s.h.frame()
+	}
+	if err := s.w.Frame(&s.h.ops); err != nil {
+		s.h.t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rectangle{Max: s.h.size})
+	if err := s.w.Screenshot(img); err != nil {
+		s.h.t.Fatal(err)
+	}
+	s.save(name, img)
+}
+
+func (s *shooter) save(name string, img image.Image) {
+	f, err := os.Create(filepath.Join(s.dir, name))
+	if err != nil {
+		s.h.t.Fatal(err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		s.h.t.Fatal(err)
+	}
+}
+
+func (s *shooter) previewScenes() {
+	s.shot("split.png")
+	for _, id := range []string{"blockquotes", "lists", "code-blocks"} {
+		s.h.a.preview.ScrollToBlock(s.h.a.doc.HeadingIndex(id))
+		s.shot("preview-" + id + ".png")
+	}
+}
+
+func (s *shooter) overlayScenes() {
+	a := s.h.a
+	a.bar.open = 2 // Format
+	s.shot("menu-format.png")
+	a.bar.open = -1
+	a.tableDialog()
+	s.shot("dialog-table.png")
+	a.dialog = NewFileDialog("Open Markdown file", "../mdmodel/testdata", "", false, mdExts, ignorePath)
+	s.shot("dialog.png")
+	a.dialog = nil
+}
+
+func ignorePath(string) {}
+
+func (s *shooter) contentScenes() {
+	s.scene("align.png", alignSample)
+	s.scene("highlight.png", highlightSample)
+	if src, err := os.ReadFile("../mdmodel/testdata/maths.md"); err == nil {
+		s.h.a.view = viewPreview
+		s.scene("maths.png", string(src))
+		s.h.a.view = viewSplit
+	}
+	s.h.setText(tocSample, 0, 0)
+	s.h.run(s.h.a.cmds.insertTOC)
+	s.h.a.preview.ScrollToBlock(0)
+	s.h.rightClick(700, 700)
+	s.shot("toc.png")
+	s.h.a.ctx.open = false
+}
+
+// scene shows a document from the top and saves a screenshot.
+func (s *shooter) scene(name, doc string) {
+	s.h.setText(doc, 0, 0)
+	s.h.a.preview.ScrollToBlock(0)
+	s.shot(name)
+}
+
+const alignSample = "# Aligned\n\n<div align=\"center\">\n\nCentred **bold** *italic* <u>underlined</u> text.\n\n</div>\n\n" +
+	"<div align=\"right\">\n\nRight aligned.\n\n</div>\n\nLeft again."
+
+const highlightSample = "```bash\n# build and run\nfor f in *.md; do\n  mdedit -pdf \"$f\" -o \"${f%.md}.pdf\"\ndone\n```\n\n" +
+	"```C#\nusing System;\n\npublic class Hello {\n    // Entry point\n    public static void Main(string[] args) {\n" +
+	"        Console.WriteLine($\"Hello {args.Length}\");\n    }\n}\n```\n\n" +
+	"```go\nfunc fib(n int) int {\n\tif n < 2 {\n\t\treturn n // base case\n\t}\n\treturn fib(n-1) + fib(n-2)\n}\n```\n"
+
+const tocSample = "# Guide\n\n## Install\n\n### Linux\n\n### FreeBSD\n\n## Usage\n\n### Shortcuts\n\n## Licence\n"

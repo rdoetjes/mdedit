@@ -127,25 +127,29 @@ func Outline(faceID uint8, g uint16) []Seg {
 	segs, err := fc.f.LoadGlyph(&fc.buf, sfnt.GlyphIndex(g), fc.upem, nil)
 	var out []Seg
 	if err == nil {
-		u := float32(fc.upem)
-		pt := func(p fixed.Point26_6) [2]float32 { return [2]float32{float32(p.X) / u, float32(p.Y) / u} }
-		for _, s := range segs {
-			var o Seg
-			switch s.Op {
-			case sfnt.SegmentOpMoveTo:
-				o = Seg{Op: MoveTo, P: [3][2]float32{pt(s.Args[0])}}
-			case sfnt.SegmentOpLineTo:
-				o = Seg{Op: LineTo, P: [3][2]float32{pt(s.Args[0])}}
-			case sfnt.SegmentOpQuadTo:
-				o = Seg{Op: QuadTo, P: [3][2]float32{pt(s.Args[0]), pt(s.Args[1])}}
-			case sfnt.SegmentOpCubeTo:
-				o = Seg{Op: CubeTo, P: [3][2]float32{pt(s.Args[0]), pt(s.Args[1]), pt(s.Args[2])}}
-			}
-			out = append(out, o)
-		}
+		out = toSegs(segs, float32(fc.upem))
 	}
 	paths[k] = out
 	return out
+}
+
+// toSegs converts sfnt segments in font units to em.
+func toSegs(segs []sfnt.Segment, upem float32) []Seg {
+	out := make([]Seg, len(segs))
+	for i, s := range segs {
+		out[i] = Seg{Op: segOps[s.Op]}
+		for j := range s.Args {
+			out[i].P[j] = [2]float32{float32(s.Args[j].X) / upem, float32(s.Args[j].Y) / upem}
+		}
+	}
+	return out
+}
+
+var segOps = map[sfnt.SegmentOp]SegOp{
+	sfnt.SegmentOpMoveTo: MoveTo,
+	sfnt.SegmentOpLineTo: LineTo,
+	sfnt.SegmentOpQuadTo: QuadTo,
+	sfnt.SegmentOpCubeTo: CubeTo,
 }
 
 // Fallback returns a glyph for r from the maths font, for text whose own

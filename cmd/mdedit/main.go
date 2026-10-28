@@ -20,47 +20,50 @@ var version = "dev"
 
 func init() { ui.Version = version }
 
-func main() {
-	pdf := flag.String("pdf", "", "export `file.md` to PDF without opening a window (output next to it, or -o)")
-	out := flag.String("o", "", "output path for -pdf")
-	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: mdedit [file.md]\n       mdedit -pdf file.md [-o out.pdf]\n\n")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
+var (
+	pdfFlag     = flag.String("pdf", "", "export `file.md` to PDF without opening a window (output next to it, or -o)")
+	outFlag     = flag.String("o", "", "output path for -pdf")
+	versionFlag = flag.Bool("version", false, "print the version and exit")
+)
 
-	if *showVersion {
+func main() {
+	flag.Usage = usage
+	flag.Parse()
+	switch {
+	case *versionFlag:
 		fmt.Println("mdedit", version)
-		return
-	}
-	if *pdf != "" {
-		if err := exportPDF(*pdf, *out); err != nil {
-			fmt.Fprintln(os.Stderr, "mdedit:", err)
-			os.Exit(1)
-		}
-		return
-	}
-	if flag.NArg() > 1 {
+	case *pdfFlag != "":
+		check(exportPDF(*pdfFlag, *outFlag))
+	case flag.NArg() > 1:
 		flag.Usage()
 		os.Exit(2)
+	default:
+		editor, err := ui.New(flag.Arg(0))
+		check(err)
+		go runWindow(editor)
+		app.Main()
 	}
+}
 
-	editor, err := ui.New(flag.Arg(0))
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: mdedit [file.md]\n       mdedit -pdf file.md [-o out.pdf]\n\n")
+	flag.PrintDefaults()
+}
+
+// check exits with an error message if err is not nil.
+func check(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mdedit:", err)
 		os.Exit(1)
 	}
-	go func() {
-		w := new(app.Window)
-		w.Option(app.Title("mdedit"), app.Size(unit.Dp(1280), unit.Dp(820)), app.MinSize(unit.Dp(480), unit.Dp(320)))
-		if err := editor.Run(w); err != nil {
-			fmt.Fprintln(os.Stderr, "mdedit:", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}()
-	app.Main()
+}
+
+// runWindow opens the editor window and exits when it is closed.
+func runWindow(editor *ui.App) {
+	w := new(app.Window)
+	w.Option(app.Title("mdedit"), app.Size(unit.Dp(1280), unit.Dp(820)), app.MinSize(unit.Dp(480), unit.Dp(320)))
+	check(editor.Run(w))
+	os.Exit(0)
 }
 
 func exportPDF(in, out string) error {

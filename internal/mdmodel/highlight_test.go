@@ -30,24 +30,31 @@ func TestHighlightLanguages(t *testing.T) {
 	}
 	for lang, code := range samples {
 		spans := Highlight(lang, code)
-		colored := false
-		for _, s := range spans {
-			if s.Color != (color.NRGBA{}) {
-				colored = true
-			}
-		}
-		if !colored {
+		if !anyColored(spans) {
 			t.Errorf("%s: no highlighting", lang)
 		}
-		var text string
-		for _, s := range spans {
-			text += s.Text
-		}
-		if text != code {
+		if text := joinText(spans); text != code {
 			t.Errorf("%s: text changed: %q", lang, text)
 		}
 	}
 	if s := Highlight("no-such-language", "x"); len(s) != 1 || s[0].Color != (color.NRGBA{}) {
 		t.Errorf("unknown language should be plain, got %+v", s)
 	}
+}
+
+func anyColored(spans []Span) bool {
+	for _, s := range spans {
+		if s.Color != (color.NRGBA{}) {
+			return true
+		}
+	}
+	return false
+}
+
+func joinText(spans []Span) string {
+	var text string
+	for _, s := range spans {
+		text += s.Text
+	}
+	return text
 }

@@ -113,14 +113,18 @@ func UpdateTOC(s State) State {
 	}
 	block := tocBlock(string(s.Text))
 	delta := len([]rune(block)) - (to - from)
-	adjust := func(p int) int {
-		switch {
-		case p >= to:
-			return p + delta
-		case p > from:
-			return from
-		}
-		return p
+	return s.replace(from, to, block, keepOutside(s.Start, from, to, delta), keepOutside(s.End, from, to, delta))
+}
+
+// keepOutside maps a position across the replacement of [from, to) by text
+// delta runes longer: positions after it move, positions inside snap to its
+// start.
+func keepOutside(p, from, to, delta int) int {
+	switch {
+	case p >= to:
+		return p + delta
+	case p > from:
+		return from
 	}
-	return s.replace(from, to, block, adjust(s.Start), adjust(s.End))
+	return p
 }

@@ -5,7 +5,11 @@
 #
 #   make            build ./bin/mdedit for this machine
 #   make test       run the tests
-#   make install    install to $(PREFIX)/bin (default /usr/local)
+#   make install    install the binary, menu entry and icons under $(PREFIX)
+#                   (default /usr/local; use sudo)
+#   make desktop    write bin/mdedit.desktop (menu entry, Exec=$(PREFIX)/bin/mdedit)
+#   make install-desktop   install the menu entry and icons under $(PREFIX)/share
+#   make icons      redraw the PNG icons in assets/icons
 #   make deps       show the system packages needed to build
 #
 # Gio, the UI toolkit, uses cgo on Linux, the BSDs and macOS. All Go code is
@@ -22,7 +26,7 @@ TAGS    ?=
 
 LDFLAGS = -s -w -X main.version=$(VERSION)
 
-.PHONY: all build run test install uninstall clean deps
+.PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons
 
 all: build
 
@@ -41,16 +45,56 @@ test:
 	if [ "$$(uname -s)" = Darwin ]; then cc=clang; fi; \
 	CGO_ENABLED=1 CC="$$cc" $(GO) test ./...
 
-install: build
+install: build install-desktop
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(BIN) $(DESTDIR)$(PREFIX)/bin/mdedit
-	./make-desktop.sh
 
-uninstall:
+uninstall: uninstall-desktop
 	rm -f $(DESTDIR)$(PREFIX)/bin/mdedit
 
 clean:
 	rm -rf bin
+
+# Desktop integration (freedesktop.org: Linux and the BSDs).
+DESKTOP   = bin/mdedit.desktop
+ICONSIZES = 16 24 32 48 64 128 256 512
+
+desktop:
+	@mkdir -p bin
+	@printf '%s\n' \
+		'[Desktop Entry]' \
+		'Type=Application' \
+		'Name=MDEdit' \
+		'GenericName=Markdown Editor' \
+		'Comment=Write Markdown with live preview, maths and PDF export' \
+		'Exec=$(PREFIX)/bin/mdedit %f' \
+		'TryExec=$(PREFIX)/bin/mdedit' \
+		'Icon=mdedit' \
+		'Terminal=false' \
+		'Categories=Development;Office;Science;' \
+		'MimeType=text/markdown;text/x-markdown;' \
+		'Keywords=markdown;editor;latex;math;pdf;' \
+		'StartupWMClass=mdedit' > $(DESKTOP)
+	@echo "wrote $(DESKTOP)"
+
+install-desktop: desktop
+	install -d $(DESTDIR)$(PREFIX)/share/applications
+	install -m 644 $(DESKTOP) $(DESTDIR)$(PREFIX)/share/applications/mdedit.desktop
+	@for s in $(ICONSIZES); do \
+		d=$(DESTDIR)$(PREFIX)/share/icons/hicolor/$${s}x$${s}/apps; \
+		install -d $$d && install -m 644 assets/icons/$${s}x$${s}/apps/mdedit.png $$d/mdedit.png; \
+	done
+	@if command -v update-desktop-database >/dev/null 2>&1; then \
+		update-desktop-database $(DESTDIR)$(PREFIX)/share/applications || true; fi
+	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then \
+		gtk-update-icon-cache -q -t $(DESTDIR)$(PREFIX)/share/icons/hicolor || true; fi
+
+uninstall-desktop:
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/mdedit.desktop
+	@for s in $(ICONSIZES); do rm -f $(DESTDIR)$(PREFIX)/share/icons/hicolor/$${s}x$${s}/apps/mdedit.png; done
+
+icons:
+	$(GO) run ./tools/mkicon assets/icons
 
 deps:
 	@echo "Build requirements: Go >= 1.25, a C compiler and pkg-config, plus:"

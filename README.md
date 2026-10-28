@@ -21,7 +21,14 @@ in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and Wayla
 
     make deps     # lists the system packages to install for your OS
     make          # builds bin/mdedit
-    make install  # installs to /usr/local/bin (PREFIX=... to change)
+    make install  # binary, menu entry and icons under /usr/local (PREFIX=... to change)
+
+`make install` (run with sudo) also adds MDEdit to the application menu on
+Linux and FreeBSD desktops: `share/applications/mdedit.desktop` (categories
+Development, Office and Science; it opens Markdown files) and the icon in
+all standard sizes under `share/icons/hicolor`. `make desktop` only writes
+`bin/mdedit.desktop`; `make icons` redraws the icons from `tools/mkicon`.
+For a per-user install without root, `make-desktop.sh` is still there.
 
 On FreeBSD both `make` and `gmake` work. The result is a single executable
 containing all Go code and fonts; it only loads the system's windowing and
@@ -130,5 +137,9 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/render    device-independent layout: blocks → positioned primitives
     internal/ui        Gio window, preview painter, file dialog
     internal/pdfout    PDF painter with page breaking (fpdf)
+    internal/edit      formatting commands as pure functions on text + selection
+    internal/tex       TeX maths typesetter (embedded STIX Two Math)
+    internal/lint      code-style test: no anonymous functions, ≤4 indent levels, ≤40-line functions
+    tools/mkicon       draws the application icon
 
 The preview and the PDF share `internal/render`, so both use the same layout.

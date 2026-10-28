@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"image/color"
 	"strconv"
 	"strings"
 
@@ -16,6 +15,7 @@ type TableDialog struct {
 	// Done receives the column and body row counts, or (0, 0) if cancelled.
 	Done func(cols, rows int)
 
+	th             *material.Theme
 	cols, rows     widget.Editor
 	insert, cancel widget.Clickable
 	err            string
@@ -51,97 +51,120 @@ func (d *TableDialog) submit() {
 }
 
 func (d *TableDialog) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	d.th = th
+	if d.handleInput(gtx) {
+		return layout.Dimensions{}
+	}
+	return modal(gtx, d.card)
+}
+
+// handleInput processes keys and clicks; it reports whether the dialog was
+// cancelled.
+func (d *TableDialog) handleInput(gtx layout.Context) bool {
 	if !d.focused {
 		gtx.Execute(key.FocusCmd{Tag: &d.cols})
 		d.focused = true
 	}
-	for _, e := range []*widget.Editor{&d.cols, &d.rows} {
-		for {
-			ev, ok := e.Update(gtx)
-			if !ok {
-				break
-			}
-			if _, ok := ev.(widget.SubmitEvent); ok {
-				d.submit()
-			}
-		}
-	}
-	// Tab moves between the two fields.
-	for {
-		ev, ok := gtx.Event(key.Filter{Name: key.NameTab, Optional: key.ModShift}, key.Filter{Name: key.NameEscape})
-		if !ok {
-			break
-		}
-		e, ok := ev.(key.Event)
-		if !ok || e.State != key.Press {
-			continue
-		}
-		if e.Name == key.NameEscape {
-			d.Done(0, 0)
-			return layout.Dimensions{}
-		}
-		next := &d.rows
-		if gtx.Focused(&d.rows) {
-			next = &d.cols
-		}
-		next.SetCaret(next.Len(), 0)
-		gtx.Execute(key.FocusCmd{Tag: next})
-	}
-	if d.cancel.Clicked(gtx) {
+	d.handleSubmit(gtx, &d.cols)
+	d.handleSubmit(gtx, &d.rows)
+	name, pressed := keyPressed(gtx, key.NameTab, key.NameEscape)
+	if (pressed && name == key.NameEscape) || d.cancel.Clicked(gtx) {
 		d.Done(0, 0)
-		return layout.Dimensions{}
+		return true
+	}
+	if pressed {
+		d.switchField(gtx)
 	}
 	if d.insert.Clicked(gtx) {
 		d.submit()
 	}
+	return false
+}
 
-	field := func(label string, e *widget.Editor) layout.FlexChild {
-		return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.Inset{Bottom: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						gtx.Constraints.Min.X = gtx.Dp(90)
-						return material.Body1(th, label).Layout(gtx)
-					}),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						gtx.Constraints.Min.X = gtx.Dp(80)
-						gtx.Constraints.Max.X = gtx.Dp(80)
-						return widget.Border{Color: borderColor, Width: 1, CornerRadius: 4}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							return layout.UniformInset(6).Layout(gtx, material.Editor(th, e, "").Layout)
-						})
-					}),
-				)
-			})
-		})
+func (d *TableDialog) handleSubmit(gtx layout.Context, e *widget.Editor) {
+	for {
+		ev, ok := e.Update(gtx)
+		if !ok {
+			return
+		}
+		if _, submit := ev.(widget.SubmitEvent); submit {
+			d.submit()
+		}
 	}
-	return modal(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.UniformInset(20).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(material.H6(th, "Insert Table").Layout),
-				layout.Rigid(layout.Spacer{Height: 14}.Layout),
-				field("Columns:", &d.cols),
-				field("Rows:", &d.rows),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					if d.err == "" {
-						return layout.Dimensions{}
-					}
-					l := material.Body2(th, d.err)
-					l.Color = color.NRGBA{R: 0xcf, G: 0x22, B: 0x2e, A: 0xff}
-					return layout.Inset{Bottom: 10}.Layout(gtx, l.Layout)
-				}),
-				layout.Rigid(layout.Spacer{Height: 6}.Layout),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{}.Layout(gtx,
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return smallButton(gtx, th, &d.cancel, "Cancel")
-						}),
-						layout.Rigid(layout.Spacer{Width: 8}.Layout),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return primaryButton(gtx, th, &d.insert, "Insert")
-						}),
-					)
-				}),
-			)
-		})
-	})
+}
+
+// switchField moves the focus between the two fields (Tab).
+func (d *TableDialog) switchField(gtx layout.Context) {
+	next := &d.rows
+	if gtx.Focused(&d.rows) {
+		next = &d.cols
+	}
+	next.SetCaret(next.Len(), 0)
+	gtx.Execute(key.FocusCmd{Tag: next})
+}
+
+func (d *TableDialog) card(gtx layout.Context) layout.Dimensions {
+	return layout.UniformInset(20).Layout(gtx, d.content)
+}
+
+func (d *TableDialog) content(gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(material.H6(d.th, "Insert Table").Layout),
+		vspace(14),
+		layout.Rigid(numberField{th: d.th, label: "Columns:", ed: &d.cols}.layout),
+		layout.Rigid(numberField{th: d.th, label: "Rows:", ed: &d.rows}.layout),
+		layout.Rigid(d.errorLine),
+		vspace(6),
+		layout.Rigid(d.buttons),
+	)
+}
+
+func (d *TableDialog) errorLine(gtx layout.Context) layout.Dimensions {
+	if d.err == "" {
+		return layout.Dimensions{}
+	}
+	l := material.Body2(d.th, d.err)
+	l.Color = errorColor
+	return layout.Inset{Bottom: 10}.Layout(gtx, l.Layout)
+}
+
+func (d *TableDialog) buttons(gtx layout.Context) layout.Dimensions {
+	return layout.Flex{}.Layout(gtx,
+		layout.Rigid(button{th: d.th, click: &d.cancel, label: "Cancel"}.layout),
+		hspace(8),
+		layout.Rigid(button{th: d.th, click: &d.insert, label: "Insert", primary: true}.layout),
+	)
+}
+
+// numberField is a labelled, narrow numeric input.
+type numberField struct {
+	th    *material.Theme
+	label string
+	ed    *widget.Editor
+}
+
+func (f numberField) layout(gtx layout.Context) layout.Dimensions {
+	return layout.Inset{Bottom: 10}.Layout(gtx, f.row)
+}
+
+func (f numberField) row(gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(f.caption),
+		layout.Rigid(f.input),
+	)
+}
+
+func (f numberField) caption(gtx layout.Context) layout.Dimensions {
+	gtx.Constraints.Min.X = gtx.Dp(90)
+	return material.Body1(f.th, f.label).Layout(gtx)
+}
+
+func (f numberField) input(gtx layout.Context) layout.Dimensions {
+	gtx.Constraints.Min.X = gtx.Dp(80)
+	gtx.Constraints.Max.X = gtx.Dp(80)
+	return framed(gtx, f.editor)
+}
+
+func (f numberField) editor(gtx layout.Context) layout.Dimensions {
+	return layout.UniformInset(6).Layout(gtx, material.Editor(f.th, f.ed, "").Layout)
 }

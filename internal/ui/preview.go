@@ -2,27 +2,19 @@ package ui
 
 import (
 	"image"
-	"image/color"
 	"math"
-	"os"
 
 	"gioui.org/f32"
-	"gioui.org/font"
 	"gioui.org/gesture"
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
-	"gioui.org/op"
 	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"golang.org/x/image/math/fixed"
 
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
-	"mdedit/internal/tex"
 )
 
 // Preview renders a parsed document.
@@ -39,6 +31,13 @@ type Preview struct {
 	clicks []gesture.Click
 	text   *textPainter
 	images map[string]*imageEntry
+
+	// Per-frame geometry.
+	ctx      render.Ctx
+	width    int
+	pad      int
+	contentW int
+	ox       float32
 }
 
 func NewPreview(shaper *text.Shaper) *Preview {
@@ -47,6 +46,7 @@ func NewPreview(shaper *text.Shaper) *Preview {
 		images: map[string]*imageEntry{},
 	}
 	p.list.Axis = layout.Vertical
+	p.ctx = render.Ctx{Theme: &render.Light, Measure: p.text.measure, ImageSize: p.imageSize}
 	return p
 }
 
@@ -78,285 +78,99 @@ func (p *Preview) EnsureVisible(i int) {
 const maxContentWidth = unit.Dp(880)
 
 func (p *Preview) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions {
-	paint.FillShape(gtx.Ops, render.Light.Bg, clip.Rect{Max: gtx.Constraints.Max}.Op())
+	fillRect(gtx, render.Light.Bg, image.Rectangle{Max: gtx.Constraints.Max})
 	if p.doc == nil {
 		return layout.Dimensions{Size: gtx.Constraints.Max}
 	}
-	width := gtx.Constraints.Max.X
-	pad := gtx.Dp(32)
-	if width < gtx.Dp(500) {
-		pad = gtx.Dp(12)
-	}
-	contentW := min(width-2*pad-gtx.Dp(10), gtx.Dp(maxContentWidth)) // leave room for the scrollbar
-	contentW = max(contentW, gtx.Dp(100))
-	ox := float32((width - contentW) / 2)
+	p.measure(gtx)
+	return material.List(th, &p.list).Layout(gtx, len(p.doc.Blocks)+2, p.listItem)
+}
 
+// measure works out the content column for this frame, dropping cached
+// layouts if its width or the font size changed.
+func (p *Preview) measure(gtx layout.Context) {
+	p.width = gtx.Constraints.Max.X
+	p.pad = gtx.Dp(32)
+	if p.width < gtx.Dp(500) {
+		p.pad = gtx.Dp(12)
+	}
+	// Leave room for the scrollbar.
+	p.contentW = max(min(p.width-2*p.pad-gtx.Dp(10), gtx.Dp(maxContentWidth)), gtx.Dp(100))
+	p.ox = float32((p.width - p.contentW) / 2)
 	em := float32(gtx.Sp(16))
-	if contentW != p.cacheW || em != p.cacheE {
+	if p.contentW != p.cacheW || em != p.cacheE {
 		p.cache = make([]*render.Layout, len(p.doc.Blocks))
-		p.cacheW, p.cacheE = contentW, em
+		p.cacheW, p.cacheE = p.contentW, em
 	}
-	ctx := &render.Ctx{
-		Em:      em,
-		Theme:   &render.Light,
-		Measure: p.text.measure,
-		ImageSize: func(src string) (int, int, bool) {
-			if img := p.image(src); img != nil {
-				return img.size.X, img.size.Y, true
-			}
-			return 0, 0, false
-		},
+	p.ctx.Em = em
+}
+
+// listItem lays out list element i: padding at both ends, blocks between.
+func (p *Preview) listItem(gtx layout.Context, i int) layout.Dimensions {
+	if i == 0 || i == len(p.doc.Blocks)+1 {
+		return layout.Dimensions{Size: image.Pt(p.width, p.pad)}
 	}
+	return p.block(gtx, i-1)
+}
 
-	n := len(p.doc.Blocks)
-	return material.List(th, &p.list).Layout(gtx, n+2, func(gtx layout.Context, i int) layout.Dimensions {
-		if i == 0 || i == n+1 {
-			return layout.Dimensions{Size: image.Pt(width, pad)}
-		}
-		bi := i - 1
-		l := p.cache[bi]
-		if l == nil {
-			var prev *mdmodel.Block
-			if bi > 0 {
-				prev = &p.doc.Blocks[bi-1]
-			}
-			l = ctx.Block(&p.doc.Blocks[bi], prev, float32(contentW))
-			p.cache[bi] = l
-		}
-		size := image.Pt(width, int(math.Ceil(float64(l.Height))))
+func (p *Preview) block(gtx layout.Context, i int) layout.Dimensions {
+	l := p.blockLayout(i)
+	size := image.Pt(p.width, int(math.Ceil(float64(l.Height))))
+	p.handleClicks(gtx, i, l)
+	p.paint(gtx, l, p.ox)
+	area := clip.Rect{Max: size}.Push(gtx.Ops)
+	p.clicks[i].Add(gtx.Ops)
+	area.Pop()
+	return layout.Dimensions{Size: size}
+}
 
-		for {
-			ev, ok := p.clicks[bi].Update(gtx.Source)
-			if !ok {
-				break
-			}
-			if ev.Kind != gesture.KindClick {
-				continue
-			}
-			pos := f32.Pt(float32(ev.Position.X)-ox, float32(ev.Position.Y))
-			for _, pr := range l.Prims {
-				if pr.Kind == render.PLink && pos.X >= pr.X && pos.X < pr.X+pr.W && pos.Y >= pr.Y && pos.Y < pr.Y+pr.H {
-					if p.OnLink != nil {
-						p.OnLink(pr.URL)
-					}
-					break
-				}
-			}
-		}
+// blockLayout returns the (cached) layout of block i.
+func (p *Preview) blockLayout(i int) *render.Layout {
+	if l := p.cache[i]; l != nil {
+		return l
+	}
+	var prev *mdmodel.Block
+	if i > 0 {
+		prev = &p.doc.Blocks[i-1]
+	}
+	l := p.ctx.Block(&p.doc.Blocks[i], prev, float32(p.contentW))
+	p.cache[i] = l
+	return l
+}
 
-		p.paint(gtx, l, ox)
-		area := clip.Rect{Max: size}.Push(gtx.Ops)
-		p.clicks[bi].Add(gtx.Ops)
-		area.Pop()
-		return layout.Dimensions{Size: size}
-	})
+// handleClicks follows links clicked in block i.
+func (p *Preview) handleClicks(gtx layout.Context, i int, l *render.Layout) {
+	for {
+		ev, ok := p.clicks[i].Update(gtx.Source)
+		if !ok {
+			return
+		}
+		if ev.Kind != gesture.KindClick {
+			continue
+		}
+		pos := f32.Pt(float32(ev.Position.X)-p.ox, float32(ev.Position.Y))
+		if url := linkAt(l, pos); url != "" && p.OnLink != nil {
+			p.OnLink(url)
+		}
+	}
+}
+
+// linkAt returns the target of the link at pos, if any.
+func linkAt(l *render.Layout, pos f32.Point) string {
+	for _, pr := range l.Prims {
+		if pr.Kind == render.PLink && pos.X >= pr.X && pos.X < pr.X+pr.W && pos.Y >= pr.Y && pos.Y < pr.Y+pr.H {
+			return pr.URL
+		}
+	}
+	return ""
+}
+
+func (p *Preview) imageSize(src string) (int, int, bool) {
+	img := p.image(src)
+	if img == nil {
+		return 0, 0, false
+	}
+	return img.size.X, img.size.Y, true
 }
 
 func rnd(v float32) int { return int(math.Round(float64(v))) }
-
-func (p *Preview) paint(gtx layout.Context, l *render.Layout, ox float32) {
-	ops := gtx.Ops
-	for _, pr := range l.Prims {
-		x := pr.X + ox
-		switch pr.Kind {
-		case render.PRect:
-			r := image.Rect(rnd(x), rnd(pr.Y), rnd(x+pr.W), rnd(pr.Y+pr.H))
-			rr := clip.UniformRRect(r, rnd(pr.Radius))
-			if pr.Stroke > 0 {
-				paint.FillShape(ops, pr.Color, clip.Stroke{Path: rr.Path(ops), Width: pr.Stroke}.Op())
-			} else {
-				paint.FillShape(ops, pr.Color, rr.Op(ops))
-			}
-		case render.PEllipse:
-			e := clip.Ellipse{Min: image.Pt(rnd(x), rnd(pr.Y)), Max: image.Pt(rnd(x+pr.W), rnd(pr.Y+pr.H))}
-			if pr.Stroke > 0 {
-				paint.FillShape(ops, pr.Color, clip.Stroke{Path: e.Path(ops), Width: pr.Stroke}.Op())
-			} else {
-				paint.FillShape(ops, pr.Color, e.Op(ops))
-			}
-		case render.PLine:
-			var path clip.Path
-			path.Begin(ops)
-			path.MoveTo(f32.Pt(x, pr.Y))
-			path.LineTo(f32.Pt(pr.W+ox, pr.H))
-			paint.FillShape(ops, pr.Color, clip.Stroke{Path: path.End(), Width: pr.Stroke}.Op())
-		case render.PText:
-			p.text.draw(gtx, pr.Font, pr.Size, pr.Text, x, pr.Y, pr.Color)
-		case render.PImage:
-			if img := p.image(pr.URL); img != nil {
-				st := op.Affine(f32.Affine2D{}.
-					Scale(f32.Point{}, f32.Pt(pr.W/float32(img.size.X), pr.H/float32(img.size.Y))).
-					Offset(f32.Pt(float32(rnd(x)), float32(rnd(pr.Y))))).Push(ops)
-				img.op.Add(ops)
-				cl := clip.Rect{Max: img.size}.Push(ops)
-				paint.PaintOp{}.Add(ops)
-				cl.Pop()
-				st.Pop()
-			}
-		case render.PGlyph:
-			segs := tex.Outline(pr.Face, pr.Glyph)
-			if len(segs) == 0 {
-				continue
-			}
-			sx, sy := pr.Size*pr.XScale, pr.Size*pr.YScale
-			pt := func(p [2]float32) f32.Point { return f32.Pt(x+p[0]*sx, pr.Y+p[1]*sy) }
-			var path clip.Path
-			path.Begin(ops)
-			for i, s := range segs {
-				switch s.Op {
-				case tex.MoveTo:
-					if i > 0 {
-						path.Close()
-					}
-					path.MoveTo(pt(s.P[0]))
-				case tex.LineTo:
-					path.LineTo(pt(s.P[0]))
-				case tex.QuadTo:
-					path.QuadTo(pt(s.P[0]), pt(s.P[1]))
-				case tex.CubeTo:
-					path.CubeTo(pt(s.P[0]), pt(s.P[1]), pt(s.P[2]))
-				}
-			}
-			path.Close()
-			paint.FillShape(ops, pr.Color, clip.Outline{Path: path.End()}.Op())
-		case render.PPoly:
-			var path clip.Path
-			path.Begin(ops)
-			for i, p := range pr.Points {
-				if i == 0 {
-					path.MoveTo(f32.Pt(p[0]+ox, p[1]))
-				} else {
-					path.LineTo(f32.Pt(p[0]+ox, p[1]))
-				}
-			}
-			path.Close()
-			paint.FillShape(ops, pr.Color, clip.Outline{Path: path.End()}.Op())
-		case render.PLink:
-			area := clip.Rect(image.Rect(rnd(x), rnd(pr.Y), rnd(x+pr.W), rnd(pr.Y+pr.H))).Push(ops)
-			pointer.CursorPointer.Add(ops)
-			area.Pop()
-		}
-	}
-}
-
-type imageEntry struct {
-	mod  int64
-	op   paint.ImageOp
-	size image.Point
-}
-
-// image loads and caches the image referenced by src.
-func (p *Preview) image(src string) *imageEntry {
-	path, ok := render.ResolveImage(p.BaseDir, src)
-	if !ok {
-		return nil
-	}
-	st, err := os.Stat(path)
-	if err != nil {
-		return nil
-	}
-	if e, ok := p.images[path]; ok && e.mod == st.ModTime().UnixNano() {
-		return e
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
-	if err != nil {
-		p.images[path] = nil
-		return nil
-	}
-	e := &imageEntry{mod: st.ModTime().UnixNano(), op: paint.NewImageOp(img), size: img.Bounds().Size()}
-	p.images[path] = e
-	return e
-}
-
-// textPainter measures and draws single-line strings with the Gio shaper,
-// using identical parameters for both so layout and painting agree.
-type textPainter struct {
-	shaper *text.Shaper
-	cache  map[measureKey]render.Metrics
-	glyphs []text.Glyph
-}
-
-type measureKey struct {
-	f    render.FontSpec
-	size float32
-	s    string
-}
-
-func newTextPainter(s *text.Shaper) *textPainter {
-	return &textPainter{shaper: s, cache: map[measureKey]render.Metrics{}}
-}
-
-func giofont(f render.FontSpec) font.Font {
-	ft := font.Font{Typeface: "Go"}
-	if f.Mono {
-		ft.Typeface = "Go Mono"
-	}
-	if f.Bold {
-		ft.Weight = font.Bold
-	}
-	if f.Italic {
-		ft.Style = font.Italic
-	}
-	return ft
-}
-
-func (t *textPainter) shape(f render.FontSpec, size float32, s string) []text.Glyph {
-	t.shaper.LayoutString(text.Parameters{
-		Font:     giofont(f),
-		PxPerEm:  fixed.Int26_6(size * 64),
-		MaxWidth: 1 << 24,
-	}, s)
-	t.glyphs = t.glyphs[:0]
-	for g, ok := t.shaper.NextGlyph(); ok; g, ok = t.shaper.NextGlyph() {
-		t.glyphs = append(t.glyphs, g)
-	}
-	return t.glyphs
-}
-
-func (t *textPainter) measure(f render.FontSpec, size float32, s string) render.Metrics {
-	k := measureKey{f, size, s}
-	if m, ok := t.cache[k]; ok {
-		return m
-	}
-	var m render.Metrics
-	gs := t.shape(f, size, s)
-	var adv fixed.Int26_6
-	for _, g := range gs {
-		adv += g.Advance
-	}
-	if len(gs) > 0 {
-		m = render.Metrics{
-			Width:   float32(adv) / 64,
-			Ascent:  float32(gs[0].Ascent) / 64,
-			Descent: float32(gs[0].Descent) / 64,
-		}
-	}
-	if len(t.cache) > 100000 {
-		t.cache = map[measureKey]render.Metrics{}
-	}
-	t.cache[k] = m
-	return m
-}
-
-func (t *textPainter) draw(gtx layout.Context, f render.FontSpec, size float32, s string, x, baseline float32, col color.NRGBA) {
-	gs := t.shape(f, size, s)
-	if len(gs) == 0 {
-		return
-	}
-	ops := gtx.Ops
-	// Shape draws relative to the first glyph's origin on the baseline.
-	st := op.Offset(image.Pt(rnd(x)+gs[0].X.Floor(), rnd(baseline))).Push(ops)
-	outline := clip.Outline{Path: t.shaper.Shape(gs)}.Op().Push(ops)
-	paint.ColorOp{Color: col}.Add(ops)
-	paint.PaintOp{}.Add(ops)
-	outline.Pop()
-	if call := t.shaper.Bitmaps(gs); call != (op.CallOp{}) {
-		call.Add(ops)
-	}
-	st.Pop()
-}

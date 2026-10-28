@@ -20,8 +20,8 @@ type Span struct {
 	// Math spans hold TeX source in Text; Display selects display style.
 	Math    bool
 	Display bool
-	Link      string      // link target; empty if not a link
-	Color     color.NRGBA // syntax-highlight colour; zero means the default colour
+	Link    string      // link target; empty if not a link
+	Color   color.NRGBA // syntax-highlight colour; zero means the default colour
 }
 
 func (s Span) sameStyle(o Span) bool {

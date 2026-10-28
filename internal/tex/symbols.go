@@ -155,60 +155,71 @@ var fontCommands = map[string]fontStyle{
 	"mathscr": fScript, "mathfrak": fFraktur, "mathsf": fSans, "mathtt": fMono,
 }
 
+// alphabet is a Unicode mathematical alphabet: the first capital, small
+// letter and digit, plus letters that live elsewhere (mostly in the
+// Letterlike Symbols block).
+type alphabet struct {
+	upper, lower, digit rune
+	exceptions          map[rune]rune
+}
+
+var alphabets = map[fontStyle]alphabet{
+	fItalic:     {upper: 0x1D434, lower: 0x1D44E, exceptions: map[rune]rune{'h': 'ℎ'}},
+	fBold:       {upper: 0x1D400, lower: 0x1D41A, digit: 0x1D7CE},
+	fBoldItalic: {upper: 0x1D468, lower: 0x1D482},
+	fBlackboard: {upper: 0x1D538, lower: 0x1D552, digit: 0x1D7D8, exceptions: map[rune]rune{
+		'C': 'ℂ', 'H': 'ℍ', 'N': 'ℕ', 'P': 'ℙ', 'Q': 'ℚ', 'R': 'ℝ', 'Z': 'ℤ'}},
+	fScript: {upper: 0x1D49C, lower: 0x1D4B6, exceptions: map[rune]rune{
+		'B': 'ℬ', 'E': 'ℰ', 'F': 'ℱ', 'H': 'ℋ', 'I': 'ℐ', 'L': 'ℒ', 'M': 'ℳ', 'R': 'ℛ', 'e': 'ℯ', 'g': 'ℊ', 'o': 'ℴ'}},
+	fFraktur: {upper: 0x1D504, lower: 0x1D51E, exceptions: map[rune]rune{
+		'C': 'ℭ', 'H': 'ℌ', 'I': 'ℑ', 'R': 'ℜ', 'Z': 'ℨ'}},
+	fSans: {upper: 0x1D5A0, lower: 0x1D5BA, digit: 0x1D7E2},
+	fMono: {upper: 0x1D670, lower: 0x1D68A, digit: 0x1D7F6},
+}
+
+// Mathematical italic and bold italic small Greek alphas.
+const (
+	italicAlpha     = 0x1D6FC
+	boldItalicAlpha = 0x1D736
+)
+
 // styled maps a character to its form in the given mathematical alphabet.
 func styled(r rune, f fontStyle) rune {
-	upper := r >= 'A' && r <= 'Z'
-	lower := r >= 'a' && r <= 'z'
-	digit := r >= '0' && r <= '9'
-	greekLower := r >= 'α' && r <= 'ω'
-	var exceptions map[rune]rune
-	var up, lo, dig rune
-	switch f {
-	case fRoman:
-		return r
-	case fItalic:
-		if r == 'h' {
-			return 'ℎ'
-		}
-		if greekLower {
-			return 0x1D6FC + (r - 'α')
-		}
-		if v, ok := italicGreekVariants[r]; ok {
-			return v
-		}
-		up, lo = 0x1D434, 0x1D44E
-	case fBold:
-		up, lo, dig = 0x1D400, 0x1D41A, 0x1D7CE
-	case fBoldItalic:
-		up, lo = 0x1D468, 0x1D482
-		if greekLower {
-			return 0x1D736 + (r - 'α')
-		}
-	case fBlackboard:
-		up, lo, dig = 0x1D538, 0x1D552, 0x1D7D8
-		exceptions = map[rune]rune{'C': 'ℂ', 'H': 'ℍ', 'N': 'ℕ', 'P': 'ℙ', 'Q': 'ℚ', 'R': 'ℝ', 'Z': 'ℤ'}
-	case fScript:
-		up, lo = 0x1D49C, 0x1D4B6
-		exceptions = map[rune]rune{'B': 'ℬ', 'E': 'ℰ', 'F': 'ℱ', 'H': 'ℋ', 'I': 'ℐ', 'L': 'ℒ', 'M': 'ℳ', 'R': 'ℛ',
-			'e': 'ℯ', 'g': 'ℊ', 'o': 'ℴ'}
-	case fFraktur:
-		up, lo = 0x1D504, 0x1D51E
-		exceptions = map[rune]rune{'C': 'ℭ', 'H': 'ℌ', 'I': 'ℑ', 'R': 'ℜ', 'Z': 'ℨ'}
-	case fSans:
-		up, lo, dig = 0x1D5A0, 0x1D5BA, 0x1D7E2
-	case fMono:
-		up, lo, dig = 0x1D670, 0x1D68A, 0x1D7F6
+	if g, ok := styledGreek(r, f); ok {
+		return g
 	}
-	if v, ok := exceptions[r]; ok {
+	a, ok := alphabets[f]
+	if !ok {
+		return r
+	}
+	return a.styled(r)
+}
+
+// styledGreek maps small Greek letters in the italic alphabets.
+func styledGreek(r rune, f fontStyle) (rune, bool) {
+	lower := r >= 'α' && r <= 'ω'
+	switch {
+	case f == fItalic && lower:
+		return italicAlpha + (r - 'α'), true
+	case f == fItalic && italicGreekVariants[r] != 0:
+		return italicGreekVariants[r], true
+	case f == fBoldItalic && lower:
+		return boldItalicAlpha + (r - 'α'), true
+	}
+	return 0, false
+}
+
+func (a alphabet) styled(r rune) rune {
+	if v, ok := a.exceptions[r]; ok {
 		return v
 	}
 	switch {
-	case upper && up != 0:
-		return up + (r - 'A')
-	case lower && lo != 0:
-		return lo + (r - 'a')
-	case digit && dig != 0:
-		return dig + (r - '0')
+	case r >= 'A' && r <= 'Z' && a.upper != 0:
+		return a.upper + (r - 'A')
+	case r >= 'a' && r <= 'z' && a.lower != 0:
+		return a.lower + (r - 'a')
+	case r >= '0' && r <= '9' && a.digit != 0:
+		return a.digit + (r - '0')
 	}
 	return r
 }
