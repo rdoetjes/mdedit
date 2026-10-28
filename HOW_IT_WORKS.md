@@ -819,37 +819,175 @@ paint.FillShape(gtx.Ops, pr.Color, clip.Outline{Path: path.End()}.Op())
 
 From there it is step 7 as for any text.
 
-### 6.10 Images
+### 6.10 Images: the same pipeline, a different paint
 
-An image needs no outlines; the question is only which image pixels land
-on which screen pixels. (§7 covers everything before this point: how images
-and videos are written, found, downloaded and sized.)
+Glyphs are paths; an image is **not** — not even a path per pixel. Every
+paint operation answers two separate questions, and glyphs and images sit
+at opposite ends of them:
 
-1. **Layout** (`render/image.go: Ctx.image`) emits
-   `Prim{Kind: PImage, X, W, H, URL}`: where and how big, not the pixels.
-2. **Decoded once** (`ui/images.go: decodeImage`): `image.Decode` (PNG,
-   JPEG, GIF) gives the pixels, wrapped in `paint.NewImageOp`. Gio uploads
-   them to the GPU as a **texture** the first time the `ImageOp` is drawn
-   and keeps it while the same op is reused.
-3. **Paint** (`ui/paint.go: paintImage`):
+| | **Where** to paint: the clip | **What colour** each pixel gets: the paint |
+|---|---|---|
+| Glyph | Complicated: the outline's curves | Simple: one colour, `paint.ColorOp` |
+| Image | Simple: one rectangle, four corners | Complicated: a grid of colours, `paint.ImageOp` |
+| Gradient | Any shape | A colour computed from the position, `paint.LinearGradientOp` |
 
-   ```go
-   scale := f32.Pt(pr.W/float32(img.size.X), pr.H/float32(img.size.Y))
-   at := f32.Pt(float32(rnd(x)), float32(rnd(pr.Y)))
-   st := op.Affine(f32.Affine2D{}.Scale(f32.Point{}, scale).Offset(at)).Push(gtx.Ops)
-   img.op.Add(gtx.Ops)                          // the paint is now the texture
-   cl := clip.Rect{Max: img.size}.Push(gtx.Ops) // the image's own rectangle, in image pixels
-   paint.PaintOp{}.Add(gtx.Ops)
-   cl.Pop()
-   st.Pop()
-   ```
+Side by side, the two painters differ in exactly those two lines:
 
-   The clip is a rectangle in the image's own pixels; the affine transform
-   scales and moves it onto the target box. A rectangle has no curves to
-   find coverage for, so Gio clips it directly where it can. When the
-   colour pass runs, `FetchColorExpr` samples the texture with filtering
-   instead of returning one colour, so a 1280 × 720 still shrunk to 600 px
-   wide blends neighbouring image pixels rather than skipping them.
+```go
+// text — ui/textpaint.go: textPainter.draw
+outline := clip.Outline{Path: t.shaper.Shape(gs)}.Op().Push(ops) // where: the letters' curves
+paint.ColorOp{Color: c}.Add(ops)                                 // what: one colour
+paint.PaintOp{}.Add(ops)
+
+// image — ui/paint.go: paintImage
+img.op.Add(gtx.Ops)                          // what: the image's pixels
+cl := clip.Rect{Max: img.size}.Push(gtx.Ops) // where: a plain rectangle
+paint.PaintOp{}.Add(gtx.Ops)
+```
+
+#### What an image is
+
+An image is **raster** data: a grid of width × height samples ("texels"
+once on the GPU), each four bytes — red, green, blue, alpha. Nothing in it
+describes shape, only colours at fixed positions. `ui/images.go:
+decodeImage` undoes the PNG/JPEG/GIF compression into that grid and wraps
+it for Gio:
+
+```go
+img, _, err := image.Decode(f)                         // compressed file → pixel grid
+…
+return &imageEntry{op: paint.NewImageOp(img), size: img.Bounds().Size()}
+```
+
+A 1280 × 720 YouTube still is 921,600 samples, about 3.7 MB once
+decoded (the JPEG on disk is a few hundred KB). Where the image comes from
+and how big it is drawn is §7; here it arrives as
+`Prim{Kind: PImage, X, Y, W, H, URL}` — the box to fill, in device units.
+
+#### Step A — uploaded once as a texture
+
+The first time an `ImageOp` is drawn, Gio copies the grid into GPU memory
+as a **texture** and keeps it in a cache for as long as the same op is
+used (Gio `gpu/gpu.go`, `renderer.texHandle`):
+
+```go
+var minFilter, magFilter driver.TextureFilter
+switch data.filter {
+case filterLinear:                 // the default for paint.ImageOp
+    minFilter, magFilter = driver.FilterLinearMipmapLinear, driver.FilterLinear
+case filterNearest:
+    minFilter, magFilter = driver.FilterNearest, driver.FilterNearest
+}
+handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA,
+    data.src.Bounds().Dx(), data.src.Bounds().Dy(),
+    minFilter, magFilter,
+    driver.BufferBindingTexture,
+)
+…
+driver.UploadImage(handle, image.Pt(0, 0), data.src)
+```
+
+`FilterLinearMipmapLinear` makes the driver also build **mipmaps**:
+copies of the image halved again and again — 640 × 360, 320 × 180 … down to
+1 × 1 — used when the image is drawn smaller than it is (Gio
+`gpu/internal/opengl/opengl.go`: `GenerateMipmap`; on macOS
+`gpu/internal/metal/metal_darwin.go`: `blitEncGenerateMipmapsForTexture`).
+
+This is why `ui/images.go` caches the `imageEntry` and its `ImageOp`: a
+new `ImageOp` for the same picture every frame would mean decoding and
+uploading 3.7 MB every frame.
+
+#### Step B — a rectangle, placed by a transform
+
+`ui/paint.go: paintImage`:
+
+```go
+func (p *Preview) paintImage(gtx layout.Context, pr *render.Prim, x float32) {
+    img := p.image(pr.URL)
+    if img == nil {
+        return
+    }
+    scale := f32.Pt(pr.W/float32(img.size.X), pr.H/float32(img.size.Y))      // image pixels → box size
+    at := f32.Pt(float32(rnd(x)), float32(rnd(pr.Y)))                        // box position, whole pixels
+    st := op.Affine(f32.Affine2D{}.Scale(f32.Point{}, scale).Offset(at)).Push(gtx.Ops)
+    img.op.Add(gtx.Ops)
+    cl := clip.Rect{Max: img.size}.Push(gtx.Ops)
+    paint.PaintOp{}.Add(gtx.Ops)
+    cl.Pop()
+    st.Pop()
+}
+```
+
+The clip is the image's own rectangle **in image pixels**, `(0,0)–(1280,
+720)`. The affine transform (scale, then move) maps that rectangle onto
+the box from the layout, here `(0,0)–(528, 297)`. Because the paint and
+the clip are transformed together, the image always fills exactly its
+rectangle, whatever the scale. A rectangle has no curves, so it needs no
+coverage pass (§6.8): every screen pixel inside it has coverage 1.
+
+#### Step C — every screen pixel looks up its colour
+
+The colour pass is the same `cover.frag` as for text (§6.8). Its first
+line is a template, filled in per kind of paint when Gio's shaders are
+generated (Gio shaders `cmd/convertshaders/main.go`):
+
+```go
+FetchColorExpr: `_color.color`,                                                    // ColorOp: one colour
+FetchColorExpr: `mix(_gradient.color1, _gradient.color2, clamp(vUV.x, 0.0, 1.0))`, // gradient
+FetchColorExpr: `texture(tex, vUV)`,                                               // ImageOp: look it up
+```
+
+`vUV` is the pixel's position inside the rectangle, 0 to 1 across and
+down. `texture()` is answered by the GPU's **texture unit**, hardware made
+for this: it maps (u, v) into the image and, with linear filtering,
+**blends the nearest samples by distance** rather than picking one.
+
+A worked pixel: the 1280 × 720 still drawn at 528 × 297 (§7.5), screen
+pixel (100, 50) measured from the image's corner, sampled at its centre:
+
+```
+in the box:     u = 100.5 / 528 ≈ 0.190     v = 50.5 / 297 ≈ 0.170
+in the image:   0.190 × 1280 ≈ 243.6        0.170 × 720 ≈ 122.4
+```
+
+That point falls *between* image pixels, and each screen pixel covers
+about 1280 / 528 ≈ 2.4 image pixels across. So the texture unit:
+
+1. picks the two mipmap levels around a 2.4× reduction: 640 × 360 (2×)
+   and 320 × 180 (4×);
+2. in each, blends the 4 samples around the point, weighted by how close
+   they are (bilinear);
+3. mixes the two results by where 2.4 lies between 2 and 4 (trilinear).
+
+The screen pixel thus gets roughly the **average of the 2.4 × 2.4 patch
+of the original** it covers. Without mipmaps, shrinking would sample
+single pixels and skip the ones between: fine detail turns into jagged
+edges, and moiré patterns that shimmer while scrolling.
+
+The result is multiplied by the coverage (1) and blended over the
+background, exactly as for text.
+
+#### Paths or pixels: why both exist
+
+You *could* draw an image as 921,600 one-pixel squares with a `ColorOp`
+each; it would be enormously slower and look worse when scaled, each
+square getting a hard edge instead of a blend. And you could store a
+glyph as a picture; it would go soft or blocky at every size but one.
+The two describe different things:
+
+| | Path (vector) | Texture (raster) |
+|---|---|---|
+| Stores | Shape: points and curves | Colour: a fixed grid of samples |
+| Enlarged | Stays sharp — the outline is recomputed at the new size | Goes soft — the GPU blends between samples it doesn't have |
+| Shrunk | Stays sharp | Fine, with mipmaps |
+| Good for | Text, maths, rules, borders, icons | Photos, screenshots, video stills |
+
+mdedit uses each where it fits. The YouTube still is a texture, but the
+**play button** on top of it is a red rounded rectangle and a white
+triangle (`render/image.go: playButton` → `PRect` + `PPoly`), and a
+ticked **task box** is a filled rounded rectangle with two stroked lines
+for the tick (`render/render.go: marker` → `PRect` + 2 × `PLine`), so both
+stay sharp at any size, on any screen, and in the PDF.
 
 ### 6.11 The PDF: the viewer rasterises
 
@@ -1221,7 +1359,8 @@ func (a *App) followLink(url string) {
     case strings.Contains(url, ":"):
         a.openExternal(url)         // https://www.youtube.com/watch?v=… → the browser
     default:
-        a.openRelative(url)         // another Markdown file next to this one
+        a.openRelative(url)         // a file next to this one: Markdown opens in mdedit,
+                                    // anything else in its default application
     }
 }
 ```
@@ -1456,7 +1595,8 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
 `imgcache.Get(src)` downloads synchronously (the PDF calls it from
 `pdfout/pdf.go: imageSize`). Only YouTube stills are allowed
-(`youtube.IsThumbnail`). Failures aren't retried for a minute.
+(`youtube.IsThumbnail`). Failures aren't retried for a minute. §7 follows
+images and videos through all layers.
 
 ---
 
