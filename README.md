@@ -190,6 +190,7 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/imgcache  downloads and caches YouTube stills
     internal/lint      code-style test: no anonymous functions, ≤4 indent levels, ≤40-line functions
     tools/mkicon       draws the application icon
+    tools/glyphdump    prints how a character is stored in the font (see HOW_IT_WORKS.md §6)
 
 The preview and the PDF share `internal/render`, so both use the same layout.
 

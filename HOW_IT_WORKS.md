@@ -60,8 +60,9 @@ That is why the preview and the PDF can't drift apart.
 | `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, fpdf |
 | `internal/imgcache` | Downloads YouTube stills into an on-disk cache (async for the preview, sync for PDF) | youtube |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
-| `internal/lint` | A test enforcing the code style (see §9) | — |
+| `internal/lint` | A test enforcing the code style (see §10) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
+| `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
 
 Rule of thumb: **lower layers never import higher ones.** If you find
 yourself wanting `render` to import `ui`, the code belongs somewhere else.
@@ -297,7 +298,8 @@ The toolbar button reaches it via `ui/window.go: handleToolbar`.
    (line breaking) and `emitLines` (→ `Prim`s).
 8. **Paint** (`ui/paint.go: paint` → `paintPrim`, switch on `Prim.Kind`) →
    e.g. text via `ui/textpaint.go: textPainter.draw` (Gio's shaper fills the
-   glyph outlines). Back in `Run`, `e.Frame` sends it to the GPU.
+   glyph outlines). Back in `Run`, `e.Frame` sends it to the GPU. §6 follows
+   one character from here down to the pixels.
 
 The PDF export takes the same path from step 7 on, with
 `pdfout/pdf.go: Write` → `placeBlock` → `Ctx.Block` →
@@ -306,9 +308,578 @@ The PDF export takes the same path from step 7 on, with
 
 ---
 
-## 6. The layers in detail
+## 6. From a character to pixels
 
-### 6.1 `internal/ui` — the window
+§5 ends with "Gio's shaper fills the glyph outlines". This section opens
+that box: how the letter **o** in a paragraph becomes coloured pixels. Most
+of this happens in libraries, not in mdedit, so the references below name
+the module as well as the file:
+
+| Short name | Module (see `go.mod` for versions) |
+|---|---|
+| go-text | `github.com/go-text/typesetting` — font parsing and shaping, used by Gio |
+| Gio | `gioui.org` — text shaper, paths, GPU renderer |
+| Gio shaders | `gioui.org/shader`, directory `gio/` — the GPU programs |
+| sfnt | `golang.org/x/image/font/sfnt` — font parsing, used by mdedit's maths |
+
+The short version: **a character's shape is not computed, it is looked
+up.** A type designer drew every glyph as curves; the font file stores
+them as points. Drawing text means finding the right glyph, decoding its
+points into curves, scaling them to the text size, and letting the GPU work
+out how much of each pixel lies inside the curves.
+
+```
+'o'  ──cmap──▶ glyph 82 ──loca──▶ bytes 11340–11468 ──glyf──▶ 20 points
+     ──implied midpoints──▶ 14 curve segments (font units, y up)
+     ──× size/2048, flip y──▶ clip path (pixels, y down)
+     ──GPU pass 1──▶ coverage per pixel (0 … 1)
+     ──GPU pass 2──▶ colour × coverage, blended over the background
+```
+
+Every number in this section comes from the real Go font, and you can print
+them yourself for any character:
+
+    go run ./tools/glyphdump o
+
+### 6.1 The font files
+
+The preview draws text with the **Go fonts** (regular, bold, italic, bold
+italic, and the same four in Go Mono). They are TrueType files compiled
+into the binary; `ui/app.go: New` hands them to Gio's shaper:
+
+```go
+shaper := text.NewShaper(text.WithCollection(gofont.Collection()))
+```
+
+`ui/textpaint.go: giofont` picks one of the eight from a `render.FontSpec`
+(`Mono`, `Bold`, `Italic`). Maths, and characters the Go fonts lack (⌘, ⇧
+…), come from **STIX Two Math**, embedded in `internal/tex/fonts/` (§6.9).
+
+A TrueType file is a directory of tables, each named by a four-letter tag.
+Four of them matter for drawing:
+
+| Table | Holds |
+|---|---|
+| `head` | Units per em (2048 for the Go fonts) and the format of `loca` |
+| `cmap` | Character → glyph number |
+| `loca` | Glyph number → where its outline starts in `glyf` |
+| `glyf` | The outlines: points, flags, contours |
+| `hmtx` | Each glyph's advance width (how far the pen moves after it) |
+
+Coordinates in a font are integers in **font units**: 2048 units = 1 em =
+the font size, the baseline is y = 0, and **y points up** (the opposite of
+the screen).
+
+### 6.2 Step 1 — character to glyph number (`cmap`)
+
+Fonts don't index glyphs by character: one character may have several
+glyphs (ligatures, alternates) and some glyphs belong to no character.
+The `cmap` table maps characters to glyph numbers. For characters up to
+U+FFFF it is a sorted list of ranges, searched by bisection
+(go-text `font/cmap.go: cmap4.Lookup`):
+
+```go
+c := uint16(r)
+for i, j := 0, len(s); i < j; {
+    h := i + (j-i)/2
+    entry := s[h]
+    if c < entry.start {
+        j = h
+    } else if entry.end < c {
+        i = h + 1
+    } else if entry.indexes == nil {
+        return GID(c + entry.delta), true        // whole range: glyph = char + offset
+    } else {
+        glyph := entry.indexes[c-entry.start]    // or one entry per character
+        …
+        return GID(uint16(glyph) + entry.delta), true
+    }
+}
+return 0, false
+```
+
+Gio's shaper calls this for every character (go-text
+`harfbuzz/font.go: nominalGlyph`). **'o' (U+006F) → glyph 82.**
+
+A character that isn't in the font gets **glyph 0**, the "missing glyph"
+box. That is why ⌘ once showed as a square in exported PDFs, and why
+`pdfout/fonts.go: needsFallback` now checks each character first.
+
+### 6.3 Step 2 — shaping: which glyphs, and where
+
+Looking up glyphs one by one isn't enough to set a line of text: some
+pairs are moved closer together (kerning, `GPOS` table), some sequences
+become one glyph (ligatures, `GSUB` table), and right-to-left scripts are
+reordered. Gio runs go-text's port of HarfBuzz for this. mdedit calls it in
+`ui/textpaint.go: textPainter.shape`:
+
+```go
+t.shaper.LayoutString(text.Parameters{
+    Font:     giofont(f),
+    PxPerEm:  fixed.Int26_6(size * 64), // 26.6 fixed point: 1/64 pixel
+    MaxWidth: 1 << 24,                  // never wrap: render has already
+}, s)                                   // broken the lines
+for g, ok := t.shaper.NextGlyph(); ok; g, ok = t.shaper.NextGlyph() {
+    t.glyphs = append(t.glyphs, g)
+}
+```
+
+Each `text.Glyph` has a packed **ID** (glyph number, font index and pixel
+size; Gio `text/shaper.go: splitGlyphID` unpacks it), its pen position
+`X`, its `Advance` (from `hmtx`, adjusted by kerning), and the line's
+`Ascent` and `Descent`.
+
+The same function serves **measuring**: `textPainter.measure` adds up the
+advances and caches the result. `render` measures with it when breaking
+lines, so the widths it plans with are exactly the widths that get painted.
+
+### 6.4 Step 3 — glyph number to bytes (`loca`)
+
+`loca` is an array of `numGlyphs + 1` offsets into `glyf`; glyph *n* is
+the bytes from `loca[n]` to `loca[n+1]` (go-text
+`font/opentype/tables/glyphs_glyf_src.go: ParseLoca`, `ParseGlyf`):
+
+```go
+for i := range out {
+    out[i] = 2 * uint32(binary.BigEndian.Uint16(src[2*i:])) // short format stores offset/2
+}
+…
+start, end := locaOffsets[i], locaOffsets[i+1]
+if start == end {   // no outline, e.g. the space
+    continue
+}
+out[i], _, err = ParseGlyph(src[start:end])
+```
+
+**Glyph 82 is bytes 11340–11468 of `glyf`** — the whole letter is 128
+bytes.
+
+### 6.5 Step 4 — bytes to points (`glyf`)
+
+A simple glyph is stored as: the bounding box; the index of the **last
+point of each contour** (a contour is one closed loop); hinting
+instructions; one **flag byte per point**; then all x coordinates, then all
+y coordinates. To save space each coordinate is a **difference from the
+previous point**, in 0, 1 or 2 bytes as the flag says:
+
+| Flag bit | Meaning |
+|---|---|
+| `0x01` | The point is **on** the curve (else it is a control point) |
+| `0x02` / `0x04` | The x / y difference is 1 byte |
+| `0x10` / `0x20` | With a 1-byte difference: it is positive. With 2 bytes: there is none, the coordinate repeats |
+| `0x08` | The next byte says how many more points use this same flag |
+
+go-text `font/opentype/tables/glyphs_glyf_src.go`:
+
+```go
+func readContourPoint(flag byte, data []byte, pos int, shortFlag, sameFlag uint8) (int, int16) {
+    var v int16
+    if flag&shortFlag != 0 {         // 1 byte, sign in the flag
+        val := data[pos]
+        pos++
+        if flag&sameFlag != 0 {
+            v += int16(val)
+        } else {
+            v -= int16(val)
+        }
+    } else if flag&sameFlag == 0 {   // 2 bytes, signed
+        val := binary.BigEndian.Uint16(data[pos:])
+        pos += 2
+        v += int16(val)
+    }                                // else 0 bytes: unchanged
+    return pos, v
+}
+
+func parseGlyphContourPoints(dataX, dataY []byte, points []GlyphContourPoint) {
+    …
+    for i, p := range points {
+        posX, offsetX = readContourPoint(p.Flag, dataX, posX, xShortVector, xIsSameOrPositiveXShortVector)
+        vX += offsetX                // running total = absolute coordinate
+        points[i].X = vX
+        …
+    }
+}
+```
+
+go-text `font/glyphs.go: getContourPoints` then keeps, per point, its
+position, whether it is on the curve, and whether it ends a contour.
+
+The **'o'**:
+
+```
+contours end at points [11 19]       → points 0–11: outer ring; 12–19: the hole
+  point  0  flag 0x05  (  562,   -25)  on-curve       0x05 = on + y is 1 byte, negative: 0 − 25
+  point  1  flag 0x22  (  343,   -25)  off-curve      0x22 = x is 1 byte, negative: 562 − 219; y repeats
+  point  2  flag 0x00  (   86,   283)  off-curve      2-byte x and y
+  point  3  flag 0x11  (   86,   543)  on-curve       leftmost point
+  point  4  flag 0x10  (   86,   806)  off-curve
+  point  5  flag 0x00  (  345,  1110)  off-curve
+  point  6  flag 0x33  (  569,  1110)  on-curve       top
+  point  7  flag 0x32  (  792,  1110)  off-curve
+  point  8  flag 0x00  ( 1052,   807)  off-curve
+  point  9  flag 0x11  ( 1052,   545)  on-curve       rightmost point
+  point 10  flag 0x10  ( 1052,   277)  off-curve
+  point 11  flag 0x00  (  792,   -25)  off-curve
+  point 12  flag 0x27  (  565,   123)  on-curve       ← the hole
+  point 13  flag 0x20  (  839,   123)  off-curve
+  point 14  flag 0x11  (  839,   548)  on-curve
+  point 15  flag 0x10  (  839,   962)  off-curve
+  point 16  flag 0x21  (  569,   962)  on-curve
+  point 17  flag 0x20  (  299,   962)  off-curve
+  point 18  flag 0x11  (  299,   543)  on-curve
+  point 19  flag 0x10  (  299,   123)  off-curve
+```
+
+Two things to notice. The bottom is at y = −25 and the top at 1110, a
+little beyond the baseline and the flat letters' height: round letters
+**overshoot** on purpose, or they would look smaller than an "x". And the
+hinting instructions — a small bytecode program that nudges points onto
+the pixel grid at small sizes — are parsed but **never run**: neither
+go-text nor Gio executes them. Gio relies on antialiasing (§6.8) instead.
+
+### 6.6 Step 5 — points to curves (implied midpoints)
+
+TrueType outlines are made of straight lines and **quadratic Bézier
+curves**. A quadratic curve runs from one on-curve point to the next and is
+pulled towards one off-curve **control point** between them:
+
+    B(t) = (1−t)²·P₀ + 2(1−t)t·C + t²·P₁,   t from 0 to 1
+
+To save space, TrueType has a shortcut: **two control points in a row
+imply an on-curve point exactly halfway between them.** go-text
+`font/renderer.go: buildSegments` restores those points while turning the
+point list into segments:
+
+```go
+for _, point := range points {
+    p := point.SegmentPoint
+    if !firstOnCurveValid {
+        if point.isOnCurve {            // first point of a contour
+            firstOnCurve = p
+            firstOnCurveValid = true
+            out = append(out, Segment{Op: ot.SegmentOpMoveTo, Args: [3]SegmentPoint{p}})
+        }
+        …                               // (a contour may also start off-curve)
+    } else if !lastOffCurveValid {
+        if !point.isOnCurve {           // a control point: keep it, wait
+            lastOffCurve = p
+            lastOffCurveValid = true
+            …
+        } else {                        // on → on: a straight line
+            out = append(out, Segment{Op: ot.SegmentOpLineTo, Args: [3]SegmentPoint{p}})
+        }
+    } else {
+        if !point.isOnCurve {           // control → control: the implied point
+            out = append(out, Segment{
+                Op:   ot.SegmentOpQuadTo,
+                Args: [3]SegmentPoint{lastOffCurve, midPoint(lastOffCurve, p)},
+            })
+            lastOffCurve = p
+            lastOffCurveValid = true
+        } else {                        // control → on: an ordinary curve
+            out = append(out, Segment{Op: ot.SegmentOpQuadTo, Args: [3]SegmentPoint{lastOffCurve, p}})
+            lastOffCurveValid = false
+        }
+    }
+    if point.isEndPoint {
+        …                               // a last line or curve back to the first point
+    }
+}
+```
+
+The **'o'** becomes 14 segments (each `QuadTo` lists its control point,
+then its end point):
+
+```
+  MoveTo ( 562.0,  -25.0)                       point 0
+  QuadTo ( 343.0,  -25.0) ( 214.5,  129.0)      control: point 1; end: implied, halfway to point 2
+  QuadTo (  86.0,  283.0) (  86.0,  543.0)      control: point 2; end: point 3
+  QuadTo (  86.0,  806.0) ( 215.5,  958.0)
+  QuadTo ( 345.0, 1110.0) ( 569.0, 1110.0)
+  QuadTo ( 792.0, 1110.0) ( 922.0,  958.5)
+  QuadTo (1052.0,  807.0) (1052.0,  545.0)
+  QuadTo (1052.0,  277.0) ( 922.0,  126.0)
+  QuadTo ( 792.0,  -25.0) ( 562.0,  -25.0)      back to the start: outer ring closed
+  MoveTo ( 565.0,  123.0)                       the hole
+  QuadTo ( 839.0,  123.0) ( 839.0,  548.0)
+  QuadTo ( 839.0,  962.0) ( 569.0,  962.0)
+  QuadTo ( 299.0,  962.0) ( 299.0,  543.0)
+  QuadTo ( 299.0,  123.0) ( 565.0,  123.0)
+```
+
+Check the implied point: ((343 + 86) / 2, (−25 + 283) / 2) = (214.5, 129).
+
+Also look at the **directions**. The outer ring goes from the bottom to
+the left, up and round to the right: clockwise. The hole goes from the
+bottom to the right, up and round to the left: anticlockwise. That is not
+a detail: it is the only thing that makes the hole a hole (§6.8). Letters
+made of straight strokes simply use `LineTo`; try
+`go run ./tools/glyphdump l`.
+
+Other kinds of glyph take other routes to the same segment list:
+
+- **Composite glyphs** are built from other glyphs, each moved or scaled
+  (a font may store "é" as "e" plus "´"). go-text
+  `font/glyphs.go: getPointsForGlyphRec` loads the parts recursively and
+  applies their transforms. (The Go fonts happen to store "é" as a simple
+  glyph with three contours.)
+- **OpenType/CFF fonts** store **cubic** Bézier curves (two control
+  points) in a `CFF` table instead of `glyf`
+  (go-text `font/renderer.go: glyphDataFromCFF1`); they come out as
+  `CubeTo` segments.
+- **Colour emoji** are stored as bitmaps or SVG, not outlines. Gio draws
+  those with `Shaper.Bitmaps` as images, which `textPainter.draw` adds
+  after the outlines.
+
+### 6.7 Step 6 — curves to a path in pixels
+
+So far everything is in font units, y up. Gio `text/gotext.go:
+shaperImpl.Shape` turns the run's glyphs into **one** `clip.Path` in
+pixels: for each glyph it moves the pen to the glyph's `X` from shaping,
+scales every point by `size / unitsPerEm`, and flips y:
+
+```go
+scaleFactor := fixedToFloat(ppem) / float32(face.Upem())   // e.g. 16 px / 2048
+glyphData := face.GlyphData(gid)                            // steps 3–5
+…
+for _, fseg := range outline.Segments {
+    …
+        a := f32.Point{
+            X: fseg.Args[i].X * scaleFactor,
+            Y: -fseg.Args[i].Y * scaleFactor,               // font y up → screen y down
+        }
+    …
+    switch fseg.Op {
+    case gotextot.SegmentOpMoveTo:
+        builder.Move(args[0])
+    case gotextot.SegmentOpLineTo:
+        builder.Line(args[0])
+    case gotextot.SegmentOpQuadTo:
+        builder.Quad(args[0], args[1])
+    case gotextot.SegmentOpCubeTo:
+        builder.Cube(args[0], args[1], args[2])
+    }
+}
+```
+
+At 16 px (one em = 16 px), the 'o''s rightmost point (1052, 545) becomes
+(8.22, −4.26): 8.22 px right of the pen and 4.26 px above the baseline.
+Coordinates stay fractional; nothing is snapped to whole pixels.
+
+mdedit's `ui/textpaint.go: textPainter.draw` uses that path as a **clip**
+and paints through it:
+
+```go
+st := op.Offset(image.Pt(rnd(x)+gs[0].X.Floor(), rnd(baseline))).Push(ops) // origin: start of the run, on the baseline
+outline := clip.Outline{Path: t.shaper.Shape(gs)}.Op().Push(ops)          // only inside the letters …
+paint.ColorOp{Color: c}.Add(ops)                                          // … with this colour …
+paint.PaintOp{}.Add(ops)                                                  // … fill.
+outline.Pop()
+if call := t.shaper.Bitmaps(gs); call != (op.CallOp{}) {                  // colour emoji, if any
+    call.Add(ops)
+}
+st.Pop()
+```
+
+None of this draws yet. These are operations recorded in `gtx.Ops`; at
+the end of the frame (`e.Frame` in `ui/app.go: Run`) Gio hands the whole
+list to its GPU renderer.
+
+### 6.8 Step 7 — the GPU: coverage, then colour
+
+A pixel is a small square, and a curve can cut through it. The renderer's
+job is to find, for every pixel, **what fraction of that square lies
+inside the outline** — its **coverage**, 0 to 1 — and mix the text colour
+with the background in that proportion. Gio's GPU renderer (Gio
+`gpu/path.go`) does it in two passes. On macOS the shaders run as Metal,
+on Linux and FreeBSD as OpenGL or Vulkan; over XRDP or in a VM that is
+often Mesa's software OpenGL, which runs the same programs on the CPU.
+
+**Preparation.** The GPU program handles quadratic curves only, so each
+`CubeTo` is first split into a few quadratics that follow it closely
+(Gio `internal/stroke/stroke.go: SplitCubic`). Lines are quadratics with
+the control point in the middle.
+
+**Pass 1: coverage (Gio shaders `stencil.vert`, `stencil.frag`).** For
+each curve segment the GPU draws a rectangle that reaches from the curve
+down to the bottom of the whole shape (`stencil.vert`: "North" is
+`maxy + 1`). For every pixel in that rectangle, `stencil.frag` runs:
+
+```glsl
+vec2 extent = clamp(vec2(vFrom.x, vTo.x), -0.5, 0.5);  // the part of this pixel's width the curve spans
+…
+float t = x0/(p1.x+sqrt(p1.x*p1.x+(v.x-p1.x)*x0));      // solve the Bézier for this pixel's x
+float y = mix(mix(left.y, vCtrl.y, t), mix(vCtrl.y, right.y, t), t);  // the curve's height there
+vec2 d_half = mix(p1, v, t);
+float dy = d_half.y/d_half.x;                           // and its slope: within one pixel,
+…                                                       // the curve is treated as a straight line
+float width = extent.y - extent.x;                      // negative if the curve runs right to left
+…
+float area = 0.5*(sides.z - sides.z*sides.y + 1.0 - sides.x+sides.x*sides.w);
+area *= width;                                          // the part of the pixel below the line, signed
+fragCover.r = area;
+```
+
+So each segment gives every pixel below it a number: how much of the
+pixel lies below the curve (1 for pixels well below it, a fraction for
+pixels it cuts through), **positive or negative depending on the
+direction the segment runs**. The results are **added** into an offscreen
+coverage texture (`gpu/path.go`: blend factors `One`, `One`).
+
+Adding is what makes the shape. Follow one column of pixels down through
+the middle of the 'o':
+
+```
+                                     top of outer ring (runs →)   adds +1 below it
+  pixel above the 'o'          0
+  pixel in the ring            +1                                 = 1   inside
+                                     top of the hole (runs ←)     adds −1 below it
+  pixel in the hole            +1 −1                              = 0   outside
+                                     bottom of the hole (runs →)  adds +1 below it
+  pixel in the ring            +1 −1 +1                           = 1   inside
+                                     bottom of outer ring (runs ←) adds −1 below it
+  pixel below the 'o'          +1 −1 +1 −1                        = 0   outside
+```
+
+Pixels that a curve cuts through get fractions — 0.3, 0.6, 0.85 — and
+those fractions are the **antialiasing**. The same arithmetic works for
+any shape with any number of contours: every glyph in every font, maths
+symbols, rounded rectangles. That is why fonts must wind holes in the
+opposite direction to their outlines.
+
+**Pass 2: colour (Gio shader `cover.frag`).** This is mdedit's
+`ColorOp` + `PaintOp`. For each pixel of the shape:
+
+```glsl
+fragColor = {{.FetchColorExpr}};                      // the paint: colour, image or gradient
+float c = min(abs(texture(cover, vCoverUV).r), 1.0);  // this pixel's coverage from pass 1
+fragColor *= c;
+```
+
+and the result is blended over the window so far (premultiplied alpha):
+
+    pixel = textColour × c + background × (1 − c)
+
+One edge pixel of dark-theme text (`#e6edf3`) on the dark background
+(`#0d1117`), with `c = 0.25`:
+
+```
+R = 0xe6 × 0.25 + 0x0d × 0.75 ≈ 67  = 0x43
+G = 0xed × 0.25 + 0x11 × 0.75 ≈ 72  = 0x48
+B = 0xf3 × 0.25 + 0x17 × 0.75 ≈ 78  = 0x4e      → #43484e
+```
+
+Pixels with `c = 1` get exactly `#e6edf3`, pixels in the hole stay
+`#0d1117`.
+
+Everything else the preview draws goes through the same two passes:
+`paint.FillShape` in `ui/paint.go` is clip + `ColorOp` + `PaintOp` for a
+rounded rectangle, an ellipse, a stroked line or a polygon instead of a
+glyph.
+
+### 6.9 Maths glyphs: mdedit does steps 1–6 itself
+
+Formulas are laid out by mdedit's own TeX engine, not by Gio's shaper, so
+mdedit looks up and decodes the STIX glyphs itself, with sfnt.
+`tex/font.go`:
+
+```go
+// lookup: character → (font, glyph number), via each face's cmap
+for i, fc := range faces {
+    if g, err := fc.f.GlyphIndex(&fc.buf, r); err == nil && g != 0 {
+        return uint8(i), uint16(g), true
+    }
+}
+
+// Outline: glyph number → segments in em, cached
+segs, err := fc.f.LoadGlyph(&fc.buf, sfnt.GlyphIndex(g), fc.upem, nil) // loca + glyf + implied points
+…
+out = toSegs(segs, float32(fc.upem))                                      // ÷ units per em → em
+```
+
+sfnt already returns y pointing down. Tall delimiters are not single
+characters: `tex/delims.go` builds them from the Unicode bracket pieces
+(⎛ ⎜ ⎝ for a big "(") or stretches one glyph with `Item.YScale`; wide
+accents stretch with `XScale`. Both end up in `Prim.XScale`/`YScale`.
+
+`ui/paint.go: paintGlyph` is step 6 by hand — scale the em coordinates
+to pixels and build the `clip.Path`:
+
+```go
+segs := tex.Outline(pr.Face, pr.Glyph)
+t := glyphTransform{x: x, y: pr.Y, sx: pr.Size * pr.XScale, sy: pr.Size * pr.YScale}
+var path clip.Path
+path.Begin(gtx.Ops)
+for i, s := range segs {
+    addSegment(&path, s, t, i > 0) // MoveTo/LineTo/QuadTo/CubeTo; a MoveTo closes the previous contour
+}
+path.Close()
+paint.FillShape(gtx.Ops, pr.Color, clip.Outline{Path: path.End()}.Op())
+```
+
+From there it is step 7 as for any text.
+
+### 6.10 Images
+
+An image needs no outlines; the question is only which image pixels land
+on which screen pixels.
+
+1. **Layout** (`render/image.go: Ctx.image`) needs only the size: it
+   reads the width and height from the file header (`ImageFileSize`), fits
+   them to the column (videos at most 66 % wide) and emits
+   `Prim{Kind: PImage, X, W, H, URL}`.
+2. **Decode once** (`ui/images.go`): `Preview.image` resolves the path
+   (relative to the document, or the cached YouTube still), and
+   `decodeImage` runs `image.Decode` (PNG, JPEG, GIF) and wraps the pixels
+   in `paint.NewImageOp`. Entries are cached by path and modification
+   time. Gio uploads the pixels to the GPU as a **texture** the first time
+   the `ImageOp` is drawn and keeps it while the same op is reused.
+3. **Paint** (`ui/paint.go: paintImage`):
+
+   ```go
+   scale := f32.Pt(pr.W/float32(img.size.X), pr.H/float32(img.size.Y))
+   at := f32.Pt(float32(rnd(x)), float32(rnd(pr.Y)))
+   st := op.Affine(f32.Affine2D{}.Scale(f32.Point{}, scale).Offset(at)).Push(gtx.Ops)
+   img.op.Add(gtx.Ops)                          // the paint is now the texture
+   cl := clip.Rect{Max: img.size}.Push(gtx.Ops) // the image's own rectangle, in image pixels
+   paint.PaintOp{}.Add(gtx.Ops)
+   cl.Pop()
+   st.Pop()
+   ```
+
+   The clip is a rectangle in the image's own pixels; the affine transform
+   scales and moves it onto the target box. A rectangle has no curves to
+   find coverage for, so Gio clips it directly where it can. When the
+   colour pass runs, `FetchColorExpr` samples the texture with filtering
+   instead of returning one colour, so a 1280 × 720 still shrunk to 600 px
+   wide blends neighbouring image pixels rather than skipping them.
+
+### 6.11 The PDF: the viewer rasterises
+
+The PDF export never produces pixels. `pdfout` writes **instructions** and
+the PDF viewer (or printer) does steps 5–7 at whatever resolution it
+needs, which is why PDF text stays sharp at any zoom.
+
+- **Text** (`pdfout/fonts.go: drawText`): the eight Go fonts are embedded
+  in the PDF (`registerFonts`; fpdf includes only the glyphs used), and
+  each run becomes a text instruction: font, size, position, string. The
+  viewer then does its own `cmap` → `glyf` → curves → coverage.
+- **Fallback characters** (⌘, ⇧, ✓ …) and **all maths**: mdedit decodes
+  the outline itself (`tex.Outline`, as in §6.9) and writes it as a
+  filled path, `pdfout/fonts.go: fillGlyph` → `pathSegment` (`MoveTo`,
+  `LineTo`, `CurveTo`; fill rule nonzero, the same idea as §6.8).
+- **Images** are embedded as files (PNG/JPEG) and placed with a size; the
+  viewer scales them.
+
+Measuring for the PDF uses fpdf's widths (`pdfout/fonts.go: measure`),
+taken from the same `hmtx` advances, so lines break at the same words as
+on screen.
+
+---
+
+## 7. The layers in detail
+
+### 7.1 `internal/ui` — the window
 
 | File | What's in it |
 |---|---|
@@ -371,7 +942,7 @@ At start-up `startDark` uses the saved choice in
 `cmdToggleTheme` (View → Dark Theme, Ctrl+Shift+D) flips it and saves it.
 The PDF exporter always uses `render.Light`.
 
-### 6.2 `internal/edit` — editing commands as pure functions
+### 7.2 `internal/edit` — editing commands as pure functions
 
 | File | Commands |
 |---|---|
@@ -402,7 +973,7 @@ func SetHeading(s State, level int) State {
 }
 ```
 
-### 6.3 `internal/mdmodel` — Markdown to blocks
+### 7.3 `internal/mdmodel` — Markdown to blocks
 
 | File | What's in it |
 |---|---|
@@ -439,7 +1010,7 @@ func (b *builder) block(n ast.Node) {
 `emit` stamps every block with its source line, its containers (`Decor`)
 and any active alignment.
 
-### 6.4 `internal/render` — blocks to primitives
+### 7.4 `internal/render` — blocks to primitives
 
 | File | What's in it |
 |---|---|
@@ -466,7 +1037,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 }
 ```
 
-### 6.5 `internal/pdfout` — primitives to PDF
+### 7.5 `internal/pdfout` — primitives to PDF
 
 | File | What's in it |
 |---|---|
@@ -475,7 +1046,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 | `draw.go` | `drawPrim` dispatcher and one function per `Prim` kind |
 | `fonts.go` | The embedded Go fonts, measuring, and **fallback glyphs** (⌘, ⇧, ✓ … drawn as outlines from the maths font) |
 
-### 6.6 `internal/tex` — maths
+### 7.6 `internal/tex` — maths
 
 | File | What's in it |
 |---|---|
@@ -489,7 +1060,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 `tex.Layout(src, display)` returns a `Box` of `Item`s in em units;
 `render/render.go: mathPrims` turns them into `PGlyph`/`PRect`/`PPoly` prims.
 
-### 6.7 `internal/imgcache` and `internal/youtube`
+### 7.7 `internal/imgcache` and `internal/youtube`
 
 `imgcache.Fetch(src, done)` downloads in the background (the preview calls
 it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
@@ -499,7 +1070,7 @@ it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
 
 ---
 
-## 7. Recipes: where to add things
+## 8. Recipes: where to add things
 
 ### Add an editing command (menu item, shortcut, maybe a toolbar icon)
 
@@ -541,7 +1112,7 @@ Touch these, in order — the compiler won't remind you about the switches:
    may split it across pages.
 4. If you need a new kind of shape, see the next recipe.
 5. Test: `mdmodel/*_test.go` for parsing, a render or PDF test, and a
-   screenshot scene (§8).
+   screenshot scene (§9).
 
 ### Add an inline style or inline element
 
@@ -581,7 +1152,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 8. Finding bugs
+## 9. Finding bugs
 
 ### Symptom → where to look
 
@@ -654,7 +1225,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 9. Code style
+## 10. Code style
 
 Enforced by `internal/lint/style_test.go`, which runs with `make test`:
 
