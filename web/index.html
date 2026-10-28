@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!-- The page around mdedit's WebAssembly build (make wasm). Gio draws the
+     whole editor into a canvas inside #giowindow. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mdedit</title>
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #ffffff; color: #1f2328;
+               font-family: system-ui, sans-serif; }
+  @media (prefers-color-scheme: dark) { html, body { background: #0d1117; color: #e6edf3; } }
+  #giowindow { position: fixed; inset: 0; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+             justify-content: center; gap: 12px; }
+  #loading img { width: 64px; height: 64px; }
+  #loading .error { color: #cf222e; max-width: 40em; text-align: center; }
+</style>
+</head>
+<body>
+<div id="loading"><img src="icon.png" alt=""><div id="message">Loading mdedit…</div></div>
+<div id="giowindow"></div>
+<script src="wasm_exec.js"></script>
+<script>
+"use strict";
+
+// mdedit's shortcuts use Ctrl (⌘ on a Mac). Stop the browser from also
+// acting on them (Ctrl+S saving the page, Ctrl+F its own search …); Gio
+// still receives the keys. Copy, cut and paste keep their default so the
+// clipboard works, zoom keys stay with the browser, and so do paste as
+// plain text and two developer-tools keys (Ctrl+Shift+I is mdedit's Insert
+// Image; F12 still opens the tools). Some keys, like Ctrl+N, Ctrl+T and
+// Ctrl+W, can't be taken from the browser at all; use the menus for those.
+const browserKeys = new Set(["c", "v", "x", "+", "-", "="]); // Ctrl+…
+const browserShiftKeys = new Set(["v", "j", "c"]);           // Ctrl+Shift+…
+function keepShortcut(e) {
+  if (!(e.ctrlKey || e.metaKey)) {
+    return;
+  }
+  const keep = e.shiftKey ? browserShiftKeys : browserKeys;
+  if (!keep.has(e.key.toLowerCase())) {
+    e.preventDefault();
+  }
+}
+addEventListener("keydown", keepShortcut, { capture: true });
+
+function failed(err) {
+  const m = document.getElementById("message");
+  m.className = "error";
+  m.textContent = "mdedit could not start: " + err;
+}
+
+async function start() {
+  if (!("WebAssembly" in window)) {
+    throw new Error("this browser has no WebAssembly");
+  }
+  const go = new Go();
+  const result = await WebAssembly.instantiateStreaming(fetch("mdedit.wasm"), go.importObject);
+  document.getElementById("loading").remove();
+  await go.run(result.instance);
+}
+start().catch(failed);
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# PROVIDE: mdedit_web
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# Serves the WebAssembly build of mdedit (make wasm; make install-jail).
+#
+# Settings for /etc/rc.conf (set them with sysrc):
+#
+#   mdedit_web_enable="YES"     start at boot (default NO)
+#   mdedit_web_addr=":8080"     listen address
+#   mdedit_web_dir="/usr/local/www/content_renderer"
+#                               folder with index.html and mdedit.wasm
+#   mdedit_web_user="www"       user the server runs as
+#   mdedit_web_flags=""         extra flags, e.g. for HTTPS:
+#                               "-tls-cert /usr/local/etc/ssl/c.pem -tls-key /usr/local/etc/ssl/k.pem"
+#                               (browsers allow the clipboard only on HTTPS pages)
+
+. /etc/rc.subr
+
+name="mdedit_web"
+rcvar="mdedit_web_enable"
+
+load_rc_config $name
+
+: ${mdedit_web_enable:="NO"}
+: ${mdedit_web_addr:=":8080"}
+: ${mdedit_web_dir:="/usr/local/www/content_renderer"}
+: ${mdedit_web_user:="www"}
+: ${mdedit_web_flags:=""}
+
+rundir="/var/run/${name}"
+pidfile="${rundir}/${name}.pid"
+logfile="/var/log/${name}.log"
+procname="/usr/local/bin/mdedit-web"
+command="/usr/sbin/daemon"
+command_args="-f -p ${pidfile} -o ${logfile} -u ${mdedit_web_user} ${procname} -addr ${mdedit_web_addr} -dir ${mdedit_web_dir} ${mdedit_web_flags}"
+
+start_precmd="${name}_prestart"
+
+# The pid and log files must be writable by the server's user.
+mdedit_web_prestart()
+{
+	install -d -o "${mdedit_web_user}" -m 755 "${rundir}"
+	if [ ! -e "${logfile}" ]; then
+		install -o "${mdedit_web_user}" -m 644 /dev/null "${logfile}"
+	fi
+}
+
+run_rc_command "$1"
