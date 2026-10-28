@@ -268,11 +268,11 @@ for {
 func (a *App) layout(gtx layout.Context) {
     a.handleInput(gtx)        // shortcuts, Enter/Tab/⌘-keys, toolbar, find bar
     a.handleEditorEvents(gtx) // typed text → reparse
+    a.spell.handleClick(gtx)  // which misspelt word was right-clicked
     a.handleRightClick(gtx)
     a.updateTitle()
     size := gtx.Constraints.Max
     a.layoutWindow(gtx)       // menu bar, toolbar, panes, status bar
-    a.restoreSelection()
     gtx.Constraints = layout.Exact(size)
     a.layoutOverlay(gtx)      // dialog, context menu or open drop-down
 }

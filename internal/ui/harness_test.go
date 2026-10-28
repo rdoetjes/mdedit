@@ -69,6 +69,13 @@ func (h *harness) rightClick(x, y float32) {
 	h.frame()
 }
 
+// scroll turns the mouse wheel by dy pixels at (x, y).
+func (h *harness) scroll(x, y, dy float32) {
+	h.router.Queue(pointer.Event{Kind: pointer.Scroll, Source: pointer.Mouse, Position: f32.Pt(x, y), Scroll: f32.Pt(0, dy)})
+	h.frame()
+	h.frame()
+}
+
 // run runs a command as if chosen from a menu.
 func (h *harness) run(c *command) {
 	h.a.ctx.open = false

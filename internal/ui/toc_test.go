@@ -2,7 +2,10 @@
 
 package ui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Right-clicking keeps the selection, so Cut and Copy apply to it.
 func TestRightClickKeepsSelection(t *testing.T) {
@@ -14,6 +17,22 @@ func TestRightClickKeepsSelection(t *testing.T) {
 	if !h.a.ctx.open {
 		t.Error("right-click did not open the context menu")
 	}
+}
+
+// Right-clicking after scrolling away from the caret doesn't scroll back.
+func TestRightClickKeepsScroll(t *testing.T) {
+	h := newHarness(t, "")
+	h.setText(strings.Repeat("Some line of text.\n", 400), 0, 0)
+	h.scroll(600, 700, 3000)
+	before := h.a.editor.CaretCoords()
+	if before.Y > -1000 {
+		t.Fatalf("the editor did not scroll: caret at %v", before)
+	}
+	h.rightClick(600, 700)
+	if after := h.a.editor.CaretCoords(); after != before {
+		t.Errorf("right-click scrolled the editor: caret moved from %v to %v on screen", before, after)
+	}
+	h.expectSelection(0, 0)
 }
 
 func TestTOCContextMenu(t *testing.T) {

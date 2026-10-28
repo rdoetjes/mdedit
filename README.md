@@ -62,7 +62,7 @@ numbered/bullet lists and table. Main shortcuts (⌘ instead of Ctrl on macOS):
 | Ctrl+Shift+D           | Dark / light theme        |                   |                  |
 
 View → Dark Theme (Ctrl+Shift+D) switches the whole window — menus,
-dialogs, editor and preview, including code highlighting — to a dark theme
+dialogues, editor and preview, including code highlighting — to a dark theme
 modelled on GitHub's; the menu item then reads Light Theme. The choice is
 saved in `settings.json` in the user's config directory
 (`~/.config/mdedit/` on Linux and FreeBSD, `~/Library/Application
