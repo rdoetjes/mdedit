@@ -106,10 +106,10 @@ type Layout struct {
 
 // Theme holds the colours used by the layout.
 type Theme struct {
-	Text, Muted, Link, Border color.NRGBA
-	CodeBg, InlineCodeBg      color.NRGBA
-	TableAltBg, CheckFill, Bg color.NRGBA
-	CheckMark, Error          color.NRGBA
+	Text, Muted, Link, Border              color.NRGBA
+	CodeBg, InlineCodeBg                   color.NRGBA
+	TableAltBg, TableHeadBg, CheckFill, Bg color.NRGBA
+	CheckMark, Error                       color.NRGBA
 	// CodeStyle is the chroma style that colours highlighted code.
 	CodeStyle string
 }
@@ -127,6 +127,7 @@ var Light = Theme{
 	CodeBg:       rgb(0xf6f8fa),
 	InlineCodeBg: rgb(0xeff1f3),
 	TableAltBg:   rgb(0xf6f8fa),
+	TableHeadBg:  rgb(0xf7f7f7),
 	CheckFill:    rgb(0x0969da),
 	Bg:           rgb(0xffffff),
 	CheckMark:    rgb(0xffffff),
@@ -143,6 +144,7 @@ var Dark = Theme{
 	CodeBg:       rgb(0x151b23),
 	InlineCodeBg: rgb(0x262c36),
 	TableAltBg:   rgb(0x151b23),
+	TableHeadBg:  rgb(0x1a1a1a),
 	CheckFill:    rgb(0x1f6feb),
 	Bg:           rgb(0x0d1117),
 	CheckMark:    rgb(0xffffff),

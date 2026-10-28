@@ -106,6 +106,9 @@ func (tl *tableLayout) row(r int) {
 	cells, rowH := tl.layoutCells(r)
 	if r > 0 && r%2 == 0 {
 		tl.add(Prim{Kind: PRect, Y: tl.y, W: tl.total, H: rowH, Color: tl.c.Theme.TableAltBg})
+	} else if r == 0 {
+		// the header of the table has a slightly differeny BG color
+		tl.add(Prim{Kind: PRect, Y: tl.y, W: tl.total, H: rowH, Color: tl.c.Theme.TableHeadBg})
 	}
 	x := float32(0)
 	for ci, cl := range cells {

@@ -60,7 +60,7 @@ That is why the preview and the PDF can't drift apart.
 | `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, fpdf |
 | `internal/imgcache` | Downloads YouTube stills into an on-disk cache (async for the preview, sync for PDF) | youtube |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
-| `internal/lint` | A test enforcing the code style (see §10) | — |
+| `internal/lint` | A test enforcing the code style (see §11) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 | `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
 
@@ -822,18 +822,15 @@ From there it is step 7 as for any text.
 ### 6.10 Images
 
 An image needs no outlines; the question is only which image pixels land
-on which screen pixels.
+on which screen pixels. (§7 covers everything before this point: how images
+and videos are written, found, downloaded and sized.)
 
-1. **Layout** (`render/image.go: Ctx.image`) needs only the size: it
-   reads the width and height from the file header (`ImageFileSize`), fits
-   them to the column (videos at most 66 % wide) and emits
-   `Prim{Kind: PImage, X, W, H, URL}`.
-2. **Decode once** (`ui/images.go`): `Preview.image` resolves the path
-   (relative to the document, or the cached YouTube still), and
-   `decodeImage` runs `image.Decode` (PNG, JPEG, GIF) and wraps the pixels
-   in `paint.NewImageOp`. Entries are cached by path and modification
-   time. Gio uploads the pixels to the GPU as a **texture** the first time
-   the `ImageOp` is drawn and keeps it while the same op is reused.
+1. **Layout** (`render/image.go: Ctx.image`) emits
+   `Prim{Kind: PImage, X, W, H, URL}`: where and how big, not the pixels.
+2. **Decoded once** (`ui/images.go: decodeImage`): `image.Decode` (PNG,
+   JPEG, GIF) gives the pixels, wrapped in `paint.NewImageOp`. Gio uploads
+   them to the GPU as a **texture** the first time the `ImageOp` is drawn
+   and keeps it while the same op is reused.
 3. **Paint** (`ui/paint.go: paintImage`):
 
    ```go
@@ -868,8 +865,8 @@ needs, which is why PDF text stays sharp at any zoom.
   the outline itself (`tex.Outline`, as in §6.9) and writes it as a
   filled path, `pdfout/fonts.go: fillGlyph` → `pathSegment` (`MoveTo`,
   `LineTo`, `CurveTo`; fill rule nonzero, the same idea as §6.8).
-- **Images** are embedded as files (PNG/JPEG) and placed with a size; the
-  viewer scales them.
+- **Images** are embedded as files (PNG, JPEG, GIF) and placed with a
+  size; the viewer scales them (§7.7).
 
 Measuring for the PDF uses fpdf's widths (`pdfout/fonts.go: measure`),
 taken from the same `hmtx` advances, so lines break at the same words as
@@ -877,9 +874,402 @@ on screen.
 
 ---
 
-## 7. The layers in detail
+## 7. Images and YouTube videos
 
-### 7.1 `internal/ui` — the window
+Images and videos take the same road as text — Markdown → `Block` →
+`Layout` → painter — with two extra problems: the pixels live **somewhere
+else** (a file, or YouTube's servers), and they may **arrive late**. This
+section follows both kinds from the Markdown to the screen and the PDF.
+
+```
+![Alt](src)                       ┐
+[![Title](still URL)](watch URL)  ┘ Markdown
+      │ mdmodel/parse.go: paragraph, soleImage
+      ▼
+Block{Kind: Image, Src, Alt, Link, Video}
+      │ render/images.go: ResolveImage ── remote YouTube still? ──▶ imgcache (download, disk cache)
+      │ Ctx.ImageSize (preview: decode / PDF: file header)
+      ▼ render/image.go: Ctx.image, fitImage, playButton
+Layout{PImage | placeholder PRect, play button PRect + PPoly, PLink}
+      │
+      ├─▶ ui/paint.go: paintImage (texture, §6.10)       click → followLink → browser
+      └─▶ pdfout/draw.go: drawImage (embedded file)      click → PDF link annotation
+```
+
+### 7.1 How they are written
+
+mdedit has no video syntax of its own; it uses the notation GitHub
+READMEs use, so documents look the same on GitHub:
+
+```markdown
+![A diagram](images/diagram.png)                          an image
+
+[![Logo](logo.png)](https://example.com)                  an image that is a link
+
+[![Video Title](https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
+                                                          a video: a link to the watch page
+                                                          around the video's still image
+```
+
+A video is therefore **just a linked image** whose link target is a
+YouTube video. The still (`maxresdefault.jpg`) is the picture YouTube shows
+before you press play; GitHub shows exactly this, and so does mdedit.
+Nothing is ever played inside mdedit: a click opens the browser.
+
+An image is only drawn as a picture when it is **alone in its paragraph**
+(possibly wrapped in one link). An image in the middle of a sentence is
+shown as its alt text, `[image: Alt]`, in italics and clickable
+(`mdmodel/inline.go: inlineRun.image`); drawing pictures inside lines of
+text would complicate line breaking for little gain.
+
+### 7.2 Inserting a video
+
+Insert → YouTube Video… (or the toolbar button) opens
+`ui/videodialog.go: VideoDialog`, which asks for a video ID and a title.
+The ID field also accepts a pasted link; `youtube.ParseID`
+(`internal/youtube/youtube.go`) understands the forms in use:
+
+```go
+func ParseID(s string) (string, bool) {
+    s = strings.TrimSpace(s)
+    if ValidID(s) {                 // 11 characters of [A-Za-z0-9_-]
+        return s, true
+    }
+    u, err := url.Parse(s)
+    if err != nil || !isYouTubeHost(u.Hostname()) {
+        return "", false
+    }
+    id := idFromURL(u)              // ?v=ID, youtu.be/ID, /embed/ID, /shorts/ID, /live/ID, /vi/ID
+    return id, ValidID(id)
+}
+```
+
+The dialog reports to `ui/commands.go: videoChosen`, which can't edit the
+text itself (dialogs have no `gtx`), so it leaves the edit for the next
+frame:
+
+```go
+func (a *App) videoChosen(id, title string) {
+    a.dialog = nil
+    if id != "" {
+        a.pendingEdit = videoLink{id, title}.apply  // ui/edits.go
+    }
+}
+```
+
+`videoLink.apply` calls `edit.Video`, which puts the Markdown from
+`youtube.Markdown(id, title)` on a line of its own (`edit/edit.go:
+ownLine`). From there it is ordinary typing: `reparse`, and §5.
+
+### 7.3 Parsing: an image block
+
+goldmark parses `![Alt](src)` as an `ast.Image` inside a paragraph, and a
+linked image as an `ast.Image` inside an `ast.Link`. `mdmodel/parse.go:
+paragraph` checks whether that is all the paragraph contains:
+
+```go
+func (b *builder) paragraph(n ast.Node) {
+    _, tight := n.(*ast.TextBlock)
+    if img, link, ok := soleImage(n); ok {
+        blk := Block{Kind: Image, Src: string(img.Destination), Alt: plainText(img, b.src), Link: link}
+        blk.Video = link != "" && youtube.IsVideoLink(link)
+        b.emit(n, blk, tight)
+        return
+    }
+    b.emit(n, Block{Kind: Paragraph, Spans: b.inlines(n)}, tight)
+}
+
+func soleImage(n ast.Node) (*ast.Image, string, bool) {
+    if n.ChildCount() != 1 {
+        return nil, "", false
+    }
+    switch c := n.FirstChild().(type) {
+    case *ast.Image:                          // ![Alt](src)
+        return c, "", true
+    case *ast.Link:                           // [![Alt](src)](link)
+        img, ok := c.FirstChild().(*ast.Image)
+        return img, string(c.Destination), ok && c.ChildCount() == 1
+    }
+    return nil, "", false
+}
+```
+
+The result for the video above:
+
+```go
+Block{
+    Kind:  Image,
+    Src:   "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+    Alt:   "Video Title",
+    Link:  "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    Video: true,             // because the *link* is a YouTube video
+    Line:  …, Align: …,      // as for every block (emit)
+}
+```
+
+Note what decides `Video`: the **link**, not the image. Any picture
+linked to a YouTube video gets the video treatment (66 % width, play
+button); a YouTube still without a link is an ordinary image.
+
+### 7.4 Finding the pixels: local files and the download cache
+
+`render/images.go: ResolveImage` turns `Src` into a file path on disk,
+for both the preview and the PDF:
+
+```go
+func ResolveImage(baseDir, src string) (string, bool) {
+    if imgcache.Allowed(src) {            // a YouTube still:
+        return imgcache.Path(src)         //   its downloaded copy, if there is one yet
+    }
+    if strings.Contains(src, "://") {     // any other remote image: not shown
+        if !strings.HasPrefix(src, "file://") {
+            return "", false
+        }
+        src = strings.TrimPrefix(src, "file://")
+    }
+    if p, err := url.PathUnescape(src); err == nil {
+        src = p                           // "my%20image.png" → "my image.png"
+    }
+    if !filepath.IsAbs(src) {
+        src = filepath.Join(baseDir, src) // relative to the document's folder
+    }
+    return src, true
+}
+```
+
+**Only YouTube stills are downloaded.** `imgcache.Allowed` is
+`youtube.IsThumbnail`: `https://` on `img.youtube.com` or `i.ytimg.com`
+with a path starting `/vi/`. A Markdown file can otherwise make an editor
+fetch any URL just by being opened — a tracking pixel tells the sender
+who read the file, and when. Other remote images show their alt text.
+
+`internal/imgcache` keeps the downloads in `<UserCacheDir>/mdedit/images`
+(`~/.cache/mdedit/images` on Linux and FreeBSD,
+`~/Library/Caches/mdedit/images` on macOS). Each file is named after a
+hash of its URL plus the URL's extension (the PDF writer uses the
+extension to tell the image type). It has two entry points:
+
+| | Used by | Behaviour |
+|---|---|---|
+| `Fetch(src, done)` | the preview | Returns at once; downloads in a goroutine and calls `done` when the file is there |
+| `Get(src)` | the PDF export | Downloads now and waits (the export needs the image before it can lay out the page) |
+
+Both share the same rules (`imgcache.go: start`, `finish`, `download`,
+`fetch`, `store`):
+
+- **No duplicates:** a URL already being downloaded (`inflight`) isn't
+  fetched again; the preview asks every frame until it arrives.
+- **No hammering:** after a failure the URL isn't tried again for a
+  minute (`retryAfter`). The preview keeps showing the placeholder or
+  alt text meanwhile.
+- **Fallback still:** `maxresdefault.jpg` doesn't exist for some older or
+  low-resolution videos. On a 404, `download` fetches `hqdefault.jpg`,
+  which exists for every video, and stores it under the original URL's
+  name.
+- **Checked and bounded:** at most 10 MB, a 15 s timeout, and the data
+  must decode as an image (`image.DecodeConfig`) before it is kept.
+- **Atomic:** the file is written as `….tmp` and renamed, so a reader
+  never sees half an image.
+
+### 7.5 Layout: size, alignment, placeholder, play button
+
+`render/image.go: Ctx.image` turns the block into prims. The device tells
+it the image's size in pixels through `Ctx.ImageSize`:
+
+- **Preview** (`ui/preview.go: imageSize`): decodes the image through
+  `Preview.image` (§7.6) — it needs the pixels anyway.
+- **PDF** (`pdfout/pdf.go: imageSize`): `imgcache.Get` for a still, then
+  `render.ImageFileSize`, which reads only the file header
+  (`image.DecodeConfig`), cached by path and modification time. Formats
+  the PDF can't embed report "no size".
+
+```go
+func (c *Ctx) image(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, float32) {
+    pw, ph, ok := c.imageSize(b.Src)
+    loading := !ok && b.Video && c.VideoControls
+    if loading {
+        pw, ph, ok = 16, 9, true             // keep the space of a 16:9 still
+    }
+    if !ok || pw == 0 || ph == 0 {
+        return c.altText(b, w, col)           // "[image: Alt]", italic, clickable
+    }
+    iw, ih := c.fitImage(b, float32(pw), float32(ph), w)
+    x := alignedX(b.Align, w, iw)             // <div align="center"> etc.
+    l := &Layout{Height: ih}
+    if loading {
+        l.Prims = append(l.Prims, Prim{Kind: PRect, X: x, W: iw, H: ih, Radius: 0.4 * c.Em, Color: videoPlaceholder})
+    } else {
+        l.Prims = append(l.Prims, Prim{Kind: PImage, X: x, W: iw, H: ih, URL: b.Src})
+    }
+    if b.Video && c.VideoControls {
+        l.Prims = append(l.Prims, playButton(x, iw, ih)...)
+    }
+    if b.Link != "" {
+        l.Prims = append(l.Prims, Prim{Kind: PLink, X: x, W: iw, H: ih, URL: b.Link})
+    }
+    return l, min(ih, c.Em)                   // "baseline", for a list bullet beside the image
+}
+```
+
+`VideoControls` is set by the preview only: the PDF gets neither the
+placeholder (it waits for the download instead) nor the play button (it
+can't play anything; the still is a link to the video).
+
+**Size** (`fitImage`):
+
+```go
+iw, ih := pw*c.Em/16, ph*c.Em/16               // image pixels count as CSS pixels: 16 per em
+if b.Video {
+    iw, ih = w*videoShare, w*videoShare*ph/pw  // videos: 66 % of the column, keep the aspect ratio
+}
+if iw > w {
+    iw, ih = w, ih*w/iw                         // never wider than the column
+}
+if c.MaxImageHeight > 0 && ih > c.MaxImageHeight {
+    iw, ih = iw*c.MaxImageHeight/ih, c.MaxImageHeight  // PDF: never taller than a page
+}
+```
+
+Counting image pixels as CSS pixels makes an image the same size
+*relative to the text* everywhere: a 400 × 300 PNG is 25 em wide, which
+is 400 device pixels on a normal screen (em = 16 px), 800 on a Retina
+screen (em = 32 px), and 262.5 pt in the PDF (em = 10.5 pt).
+
+**A worked video**, in a preview column 800 px wide at em = 16 px, with
+a 1280 × 720 still:
+
+```
+fitImage:     iw = 800 × 0.66 = 528,   ih = 528 × 720 / 1280 = 297
+alignedX:     x = 0 (left), 136 (centre), 272 (right)
+playButton:   bw = max(528 × 0.14, 24) = 73.9   bh = 0.7 × bw = 51.7
+              centred at (x + 264, 148.5), corner radius 0.28 × bh = 14.5
+              triangle half-height t = 0.22 × bh = 11.4
+
+Layout{Height: 297, Prims: [
+    PImage  x 0      y 0      528 × 297   URL: …/maxresdefault.jpg
+    PRect   x 227    y 122.6  73.9 × 51.7 red, rounded
+    PPoly   (254.9, 137.1) (276.5, 148.5) (254.9, 159.9)   white triangle
+    PLink   x 0      y 0      528 × 297   URL: https://www.youtube.com/watch?v=…
+]}
+```
+
+The play button is not an icon file: it is a red rounded rectangle and a
+white triangle, drawn like any other shape (§6.8), so it is sharp at
+every size.
+
+### 7.6 The preview: decode, cache, arrive late, click
+
+`ui/images.go: Preview.image` is called both by layout (for the size)
+and by `paintImage` (for the pixels):
+
+```go
+func (p *Preview) image(src string) *imageEntry {
+    path, ok := render.ResolveImage(p.BaseDir, src)
+    if !ok {
+        if imgcache.Allowed(src) {
+            imgcache.Fetch(src, p.imageArrived)     // not downloaded yet: start (once)
+        }
+        return nil
+    }
+    st, err := os.Stat(path)
+    if err != nil || st.IsDir() {
+        return nil
+    }
+    e := p.cachedImage(path, st.ModTime().UnixNano()) // decoded again only if the file changed
+    if e.failed {
+        return nil
+    }
+    return e
+}
+```
+
+Each `imageEntry` holds the `paint.ImageOp` (the pixels) and the size. A
+file that fails to decode is remembered as `failed`, so a broken image
+costs one attempt, not one per frame. Because entries are keyed by
+modification time, re-saving an image in another program shows up in
+the preview without restarting.
+
+**A video arriving late**, frame by frame:
+
+1. **Open the document.** Layout asks for the still's size: `ResolveImage`
+   finds no cached file, `Fetch` starts a goroutine, `image` returns nil.
+   `Ctx.image` sees a video without a size → `loading` → a dark 16:9
+   placeholder with the play button. The layout is cached like any other.
+2. **Meanwhile** the user types; the placeholder stays; no frame waits
+   for the network.
+3. **The download finishes** (on the goroutine): `imageArrived` sets
+   `imagesChanged` (an atomic, because it's another goroutine) and calls
+   `Invalidate`, which asks Gio for a frame.
+4. **Next frame:** `Preview.measure` sees `imagesChanged.Swap(false)` and
+   drops the layout cache. The block is laid out again; this time
+   `ResolveImage` finds the file, `decodeImage` decodes it, the size is
+   real, and the layout has a `PImage` instead of the placeholder.
+   `paintImage` draws it (§6.10).
+
+An ordinary remote still without a video link has no placeholder: it
+shows its alt text until the download arrives, then the image.
+
+**Clicking** the still: `ui/preview.go: block` registers a click area
+over each block; `handleClicks` finds the `PLink` under the pointer
+(`linkAt`) and calls `OnLink`, which is `ui/files.go: followLink`:
+
+```go
+func (a *App) followLink(url string) {
+    switch {
+    case strings.HasPrefix(url, "#"):
+        a.jumpToHeading(url)        // a heading in this document
+    case strings.Contains(url, ":"):
+        a.openExternal(url)         // https://www.youtube.com/watch?v=… → the browser
+    default:
+        a.openRelative(url)         // another Markdown file next to this one
+    }
+}
+```
+
+`openExternal` → `ui/widgets.go: openURL` runs `open` on macOS,
+`xdg-open` on Linux and the BSDs, and `rundll32 url.dll,…` on Windows.
+The hand cursor over the still comes from the same `PLink`
+(`ui/paint.go: linkCursor`).
+
+### 7.7 The PDF
+
+The PDF uses the same `Block` and the same `Ctx.image`, with
+`VideoControls` off, so a video is just its still, linked to the watch
+page.
+
+- **Before layout:** `pdfout/pdf.go: imageSize` calls `imgcache.Get`, so
+  the export **waits** for any still not yet downloaded. Offline, the
+  download fails and the block falls back to its alt text — a clickable
+  `[image: Video Title]` linking to the video.
+- **Page breaks:** an image is never split; `Ctx.image` sets no
+  `Layout.Breaks`, so an image that doesn't fit moves to the next page
+  (`pdfout/paging.go: place`), and `MaxImageHeight` (the page height
+  minus margins) guarantees it fits on an empty one.
+- **Drawing** (`pdfout/draw.go: drawImage`): the image file is embedded
+  as it is (`fpdf.ImageOptions` with the type from the extension, PNG,
+  JPEG or GIF) and placed at the prim's box; the viewer scales it. fpdf
+  embeds each file once, however often it appears.
+- **The link** (`pdfout/draw.go: drawLink`): the `PLink` prim becomes a
+  PDF link annotation over the image (`LinkString`), so clicking the
+  still in a PDF viewer opens the video too. A `#heading` link becomes an
+  internal link to that heading's page instead.
+
+### 7.8 When an image doesn't show
+
+| What you see | Why | Where |
+|---|---|---|
+| `[image: Alt]` for a remote image | Only YouTube stills are downloaded | `render/images.go: ResolveImage`, `youtube.IsThumbnail` |
+| `[image: Alt]` for a local file | Path wrong (relative to the `.md` file?), or not PNG/JPEG/GIF | `ResolveImage`, `ui/images.go: decodeImage` |
+| `[image: Alt]` in the middle of a line | Pictures are drawn only when alone in their paragraph | `mdmodel/parse.go: soleImage` |
+| The dark video placeholder stays | Download failed; retried after a minute | `internal/imgcache` (delete the cache folder to start over) |
+| A video drawn as an ordinary image | The *link* isn't a YouTube video URL | `youtube.IsVideoLink` |
+| The PDF shows alt text for a video | No network during the export | `pdfout/pdf.go: imageSize` |
+
+---
+
+## 8. The layers in detail
+
+### 8.1 `internal/ui` — the window
 
 | File | What's in it |
 |---|---|
@@ -942,7 +1332,7 @@ At start-up `startDark` uses the saved choice in
 `cmdToggleTheme` (View → Dark Theme, Ctrl+Shift+D) flips it and saves it.
 The PDF exporter always uses `render.Light`.
 
-### 7.2 `internal/edit` — editing commands as pure functions
+### 8.2 `internal/edit` — editing commands as pure functions
 
 | File | Commands |
 |---|---|
@@ -973,7 +1363,7 @@ func SetHeading(s State, level int) State {
 }
 ```
 
-### 7.3 `internal/mdmodel` — Markdown to blocks
+### 8.3 `internal/mdmodel` — Markdown to blocks
 
 | File | What's in it |
 |---|---|
@@ -1010,7 +1400,7 @@ func (b *builder) block(n ast.Node) {
 `emit` stamps every block with its source line, its containers (`Decor`)
 and any active alignment.
 
-### 7.4 `internal/render` — blocks to primitives
+### 8.4 `internal/render` — blocks to primitives
 
 | File | What's in it |
 |---|---|
@@ -1037,7 +1427,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 }
 ```
 
-### 7.5 `internal/pdfout` — primitives to PDF
+### 8.5 `internal/pdfout` — primitives to PDF
 
 | File | What's in it |
 |---|---|
@@ -1046,7 +1436,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 | `draw.go` | `drawPrim` dispatcher and one function per `Prim` kind |
 | `fonts.go` | The embedded Go fonts, measuring, and **fallback glyphs** (⌘, ⇧, ✓ … drawn as outlines from the maths font) |
 
-### 7.6 `internal/tex` — maths
+### 8.6 `internal/tex` — maths
 
 | File | What's in it |
 |---|---|
@@ -1060,7 +1450,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 `tex.Layout(src, display)` returns a `Box` of `Item`s in em units;
 `render/render.go: mathPrims` turns them into `PGlyph`/`PRect`/`PPoly` prims.
 
-### 7.7 `internal/imgcache` and `internal/youtube`
+### 8.7 `internal/imgcache` and `internal/youtube`
 
 `imgcache.Fetch(src, done)` downloads in the background (the preview calls
 it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
@@ -1070,7 +1460,7 @@ it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
 
 ---
 
-## 8. Recipes: where to add things
+## 9. Recipes: where to add things
 
 ### Add an editing command (menu item, shortcut, maybe a toolbar icon)
 
@@ -1112,7 +1502,7 @@ Touch these, in order — the compiler won't remind you about the switches:
    may split it across pages.
 4. If you need a new kind of shape, see the next recipe.
 5. Test: `mdmodel/*_test.go` for parsing, a render or PDF test, and a
-   screenshot scene (§9).
+   screenshot scene (§10).
 
 ### Add an inline style or inline element
 
@@ -1152,7 +1542,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 9. Finding bugs
+## 10. Finding bugs
 
 ### Symptom → where to look
 
@@ -1225,7 +1615,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 10. Code style
+## 11. Code style
 
 Enforced by `internal/lint/style_test.go`, which runs with `make test`:
 
