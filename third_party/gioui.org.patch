@@ -1,0 +1,35 @@
+--- a/text/gotext.go
++++ b/text/gotext.go
+@@ -43,9 +43,20 @@
+ // append adds the lines of other to the end of l and ensures they
+ // are aligned to the same width.
+ func (l *document) append(other document) {
++	start := len(l.lines)
+ 	l.lines = append(l.lines, other.lines...)
+ 	l.alignWidth = max(l.alignWidth, other.alignWidth)
+-	calculateYOffsets(l.lines)
++	// mdedit patch: only the appended lines need offsets; recomputing all of
++	// them made laying out a document quadratic in its number of lines.
++	if start == 0 {
++		calculateYOffsets(l.lines)
++		return
++	}
++	currentY := l.lines[start-1].yOffset
++	for i := start; i < len(l.lines); i++ {
++		currentY += l.lines[i].lineHeight.Round()
++		l.lines[i].yOffset = currentY
++	}
+ }
+ 
+ // reset empties the document in preparation to reuse its memory.
+--- a/text/lru.go
++++ b/text/lru.go
+@@ -163,7 +163,7 @@
+ 	lineHeightScale    float32
+ }
+ 
+-const maxSize = 1000
++const maxSize = 20000
+ 
+ func gidsEqual(a []glyphInfo, glyphs []Glyph) bool {
+ 	if len(a) != len(glyphs) {

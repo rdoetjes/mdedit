@@ -65,8 +65,10 @@ func (c *collector) visit(path string, d os.DirEntry, err error) error {
 	return nil
 }
 
+// skipDir skips build output, hidden folders and third_party, which holds
+// other people's code (a patched copy of Gio).
 func skipDir(name string) bool {
-	return name == "bin" || strings.HasPrefix(name, ".")
+	return name == "bin" || name == "third_party" || strings.HasPrefix(name, ".")
 }
 
 func checkFile(t *testing.T, path string) []string {

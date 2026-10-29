@@ -2079,10 +2079,13 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   documents, or the browser), typing doesn't parse, spell-check and
   autosave on every key but 150 ms after the last one (`ui/typing.go`);
   until then `a.doc` is a little behind the editor, and the misspellings
-  and outline offsets are shifted along with each edit. The biggest cost of
-  typing in documents over ~1000 different lines is Gio itself: its
-  shaper caches 1000 lines (`gioui.org/text/lru.go: maxSize`), so the
-  editor reshapes the whole text on every change.
+  and outline offsets are shifted along with each edit.
+- **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
+  its shaper cached only 1000 lines and laid out text in quadratic time,
+  which made typing in documents over ~1000 different lines crawl. Gio's
+  editor still lays out the whole text on every change, so very long
+  files (10,000+ lines) remain slower to type in, above all in the
+  browser.
 - **Caches:** the preview caches layouts per block and resets them on a new
   document, a width or font-size change, or an image arriving
   (`ui/preview.go: measure`). `tex.Layout` and `mdmodel.Highlight` cache by
