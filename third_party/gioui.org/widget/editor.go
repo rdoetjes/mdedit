@@ -70,6 +70,9 @@ type Editor struct {
 	// PaintSelectionWhenUnfocused controls whether the selection is highlighted
 	// even when the editor does not have focus.
 	PaintSelectionWhenUnfocused bool
+	// HideCaret stops the editor from drawing its caret, for programs that
+	// draw their own (mdedit patch).
+	HideCaret bool
 
 	buffer *editBuffer
 	// scratch is a byte buffer that is reused to efficiently read portions of text
@@ -857,7 +860,7 @@ func (e *Editor) compositionBounds() image.Rectangle {
 // of the caret rectangle.
 func (e *Editor) paintCaret(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	if !e.showCaret || e.ReadOnly {
+	if !e.showCaret || e.ReadOnly || e.HideCaret {
 		return
 	}
 	e.text.PaintCaret(gtx, material)

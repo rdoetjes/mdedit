@@ -25,6 +25,8 @@ type uiColors struct {
 	matchBg     color.NRGBA // find: other matches
 	currentBg   color.NRGBA // find: the selected match
 	spellLine   color.NRGBA // the wavy line under misspelt words
+	caretBg     color.NRGBA // the editor's block caret
+	caretFg     color.NRGBA // the character under it
 }
 
 func rgba(c uint32, a uint8) color.NRGBA {
@@ -51,6 +53,8 @@ var lightColors = uiColors{
 	matchBg:     rgba(0xffd33d, 0x66),
 	currentBg:   rgba(0xff961f, 0x88),
 	spellLine:   rgba(0xe5534b, 0xff),
+	caretBg:     rgba(0xffd33d, 0xff),
+	caretFg:     rgba(0xcf222e, 0xff),
 }
 
 // darkColors follow GitHub's dark mode.
@@ -74,6 +78,8 @@ var darkColors = uiColors{
 	matchBg:     rgba(0xbb8009, 0x77),
 	currentBg:   rgba(0xdb6d28, 0x99),
 	spellLine:   rgba(0xf85149, 0xff),
+	caretBg:     rgba(0xe3b341, 0xff),
+	caretFg:     rgba(0xb62324, 0xff),
 }
 
 // col is the current palette. The UI runs on a single goroutine, so the

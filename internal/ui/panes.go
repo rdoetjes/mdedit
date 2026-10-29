@@ -118,6 +118,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	}
 	a.spell.underline(gtx, dims.Size)
 	a.find.highlight(gtx)
+	a.drawCaret(gtx, dims.Size)
 	return dims
 }
 

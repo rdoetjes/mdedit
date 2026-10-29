@@ -1831,6 +1831,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `ime.go` | Works around Gio's browser text input with selections (§12, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
+| `caret.go` | The editor's block caret: a yellow box over the character at the caret, drawn in red; it doesn't blink and shows while the editor has the focus; Gio's thin caret is switched off (`Editor.HideCaret`, a patch in `third_party`) |
 | `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines; §7) |
 | `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |
 | `outline.go` | The outline sidebar: headings, following the caret, jumping to a heading |
@@ -2231,7 +2232,8 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   to spaces (`edit.ExpandTabs`) on load and paste.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
   its shaper cached only 1000 lines and laid out text in quadratic time,
-  which made typing in documents over ~1000 different lines crawl. Gio's
+  which made typing in documents over ~1000 different lines crawl; and its
+  editor can hide its caret, for mdedit's block caret. Gio's
   editor still lays out the whole text on every change, so very long
   files (10,000+ lines) remain slower to type in, above all in the
   browser.

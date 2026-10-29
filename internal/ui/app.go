@@ -74,9 +74,12 @@ type App struct {
 	spell       spellChecker
 	outline     outline
 	recent      []string // recently used files, newest first
-	// lines holds the rune offset where each line of the text starts, as
-	// of the last reparse.
+	// runes is the text as of the last reparse, and lines the rune offset
+	// where each of its lines starts.
+	runes []rune
 	lines []int
+	// caretText draws the character under the block caret (caret.go).
+	caretText *textPainter
 	// focusEditor asks for the keyboard focus to go (back) to the editor.
 	focusEditor bool
 	// topOffset is a rune offset to show on the editor's top line on the
@@ -115,6 +118,8 @@ func New(path string) (*App, error) {
 	a.preview.OnSource = a.showSource
 	a.preview.Invalidate = a.invalidate
 	a.editor.WrapPolicy = text.WrapWords
+	a.editor.HideCaret = true // caret.go draws a block instead
+	a.caretText = newTextPainter(th.Shaper)
 	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
 	a.find.init(a)
 	st := loadSettings()
@@ -151,7 +156,7 @@ func (a *App) reparse() {
 	a.doc = mdmodel.Parse([]byte(txt))
 	a.preview.SetDocument(a.doc)
 	runes := []rune(txt)
-	a.lines = lineStarts(runes)
+	a.runes, a.lines = runes, lineStarts(runes)
 	a.spell.check(runes, a.doc)
 	a.outline.update(a.doc, a.lines)
 	a.dirty = txt != a.saved

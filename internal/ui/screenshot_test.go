@@ -172,6 +172,16 @@ func (s *shooter) contentScenes() {
 	s.h.a.ctx.open = false
 	s.spellingScene()
 	s.outlineScenes()
+	s.caretScenes()
+}
+
+// caretScenes show the block caret on a letter, in both themes.
+func (s *shooter) caretScenes() {
+	s.h.setText("# Caret\n\nThe quick brown fox jumps over the lazy dog.\n", 13, 13)
+	s.shot("caret.png")
+	s.h.a.setDark(true)
+	s.shot("dark-caret.png")
+	s.h.a.setDark(false)
 }
 
 // outlineScenes shows the outline sidebar on a long document, and the

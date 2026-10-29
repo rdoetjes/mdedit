@@ -2,9 +2,10 @@
 
 ## gioui.org
 
-A copy of [Gio](https://gioui.org) v0.10.3 with two small changes that make
-typing in long documents fast; `go.mod` uses it through a `replace`
-directive. The changes are in `gioui.org.patch`:
+A copy of [Gio](https://gioui.org) v0.10.3 with three small changes; `go.mod`
+uses it through a `replace` directive. The first two make typing in long
+documents fast, the third lets mdedit draw its own caret. The changes are
+in `gioui.org.patch`:
 
 1. `text/lru.go`: the shaper's caches hold 20000 entries instead of 1000.
    Gio caches one shaped line (paragraph) per entry, and the editor needs
@@ -16,7 +17,14 @@ directive. The changes are in `gioui.org.patch`:
    only those lines get their y offset computed, not all lines so far. That
    made laying out the editor's text quadratic in its number of lines.
 
-With both, HOW_IT_WORKS.md types without lag in the browser; a document of
+3. `widget/editor.go`: `Editor.HideCaret` stops the editor drawing its thin
+   caret; mdedit draws a steady yellow block caret instead
+   (`internal/ui/caret.go`).
+
+`go test ./widget/` reports one failure, `TestIndexPositionRunes`; Gio
+v0.10.3 fails it unchanged as well.
+
+With the first two, HOW_IT_WORKS.md types without lag in the browser; a document of
 10,000 lines takes ~57 ms per key on the desktop and ~185 ms in the
 browser, because Gio's editor still lays out (but no longer reshapes) the
 whole text on each change.

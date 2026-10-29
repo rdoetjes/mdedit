@@ -113,6 +113,9 @@ Dutch or German text full of English terms. Compound words (Dutch
 "l'homme") are understood. In the browser the dictionaries are downloaded
 again on each visit.
 
+The caret in the editor is a steady yellow block, with the character
+under it in red, so you see at a glance where you are.
+
 Click anywhere in the preview to put the editor's caret on that spot in the
 Markdown, scrolled to the editor's top line so you don't have to look for
 it: on the very word you clicked (even inside bold text, links or a
