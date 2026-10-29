@@ -1684,6 +1684,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `ime.go` | Works around Gio's browser text input with selections (§11, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
+| `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines) |
 | `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |
 | `outline.go` | The outline sidebar: headings, following the caret, jumping to a heading |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
@@ -2074,6 +2075,11 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   pixels (16 per em).
 - **Rune offsets:** `edit.State` and Gio's editor use rune offsets, not
   bytes. Mixing them up breaks on any non-ASCII text.
+- **Caret line:** Gio's `editor.CaretPos()` counts wrapped lines on
+  screen, not lines of the text. Use `App.caretLine()` (from the line
+  starts recorded at each reparse) for anything that is matched with the
+  document, such as `Block.Line`; mixing them up made the preview jump to
+  the wrong block.
 - **Tabs:** Gio can't display tab characters, so the editor converts them
   to spaces (`edit.ExpandTabs`) on load and paste.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):

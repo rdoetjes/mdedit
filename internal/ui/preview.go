@@ -24,6 +24,8 @@ type Preview struct {
 	BaseDir string
 	// OnLink is called when a link is clicked.
 	OnLink func(url string)
+	// OnSource is called when anything else is clicked.
+	OnSource func(SourceClick)
 	// Invalidate asks for a new frame; it may be called from any goroutine.
 	Invalidate func()
 	// imagesChanged is set when a downloaded image arrives.
@@ -151,7 +153,8 @@ func (p *Preview) blockLayout(i int) *render.Layout {
 	return l
 }
 
-// handleClicks follows links clicked in block i.
+// handleClicks follows links clicked in block i, and reports other
+// clicks to OnSource.
 func (p *Preview) handleClicks(gtx layout.Context, i int, l *render.Layout) {
 	for {
 		ev, ok := p.clicks[i].Update(gtx.Source)
@@ -162,9 +165,16 @@ func (p *Preview) handleClicks(gtx layout.Context, i int, l *render.Layout) {
 			continue
 		}
 		pos := f32.Pt(float32(ev.Position.X)-p.ox, float32(ev.Position.Y))
-		if url := linkAt(l, pos); url != "" && p.OnLink != nil {
-			p.OnLink(url)
-		}
+		p.clicked(i, l, pos)
+	}
+}
+
+func (p *Preview) clicked(i int, l *render.Layout, pos f32.Point) {
+	switch url := linkAt(l, pos); {
+	case url != "" && p.OnLink != nil:
+		p.OnLink(url)
+	case url == "" && p.OnSource != nil:
+		p.OnSource(p.sourceClick(i, l, pos))
 	}
 }
 
@@ -187,3 +197,61 @@ func (p *Preview) imageSize(src string) (int, int, bool) {
 }
 
 func rnd(v float32) int { return int(math.Round(float64(v))) }
+
+// sourceClick describes a click at pos in block i (laid out as l) in terms
+// of the rendered words, for finding it in the source (SourceClick).
+func (p *Preview) sourceClick(i int, l *render.Layout, pos f32.Point) SourceClick {
+	c := SourceClick{Block: i}
+	k := textPrimAt(l, pos)
+	if k < 0 {
+		return c
+	}
+	pr := &l.Prims[k]
+	run := []rune(pr.Text)
+	from, to, ok := wordAt(run, p.charIndex(pr, pos.X))
+	if !ok {
+		return c
+	}
+	c.Word = string(run[from:to])
+	c.Offset = min(max(p.charIndex(pr, pos.X)-from, 0), to-from)
+	c.Nth = wordsBefore(l, k, []rune(c.Word)) + countWord(run[:from], []rune(c.Word))
+	return c
+}
+
+// textPrimAt returns the index of the text on the line at pos nearest to
+// it, or -1.
+func textPrimAt(l *render.Layout, pos f32.Point) int {
+	best, bestDist := -1, float32(math.MaxFloat32)
+	for k := range l.Prims {
+		pr := &l.Prims[k]
+		if pr.Kind != render.PText || pos.Y < pr.Y-pr.Size || pos.Y > pr.Y+0.35*pr.Size {
+			continue
+		}
+		if d := max(pr.X-pos.X, pos.X-(pr.X+pr.W), 0); d < bestDist {
+			best, bestDist = k, d
+		}
+	}
+	return best
+}
+
+// charIndex returns the character of a text primitive at x.
+func (p *Preview) charIndex(pr *render.Prim, x float32) int {
+	run := []rune(pr.Text)
+	for n := 1; n <= len(run); n++ {
+		if pr.X+p.text.measure(pr.Font, pr.Size, string(run[:n])).Width > x {
+			return n - 1
+		}
+	}
+	return len(run)
+}
+
+// wordsBefore counts the occurrences of word in the texts before prim k.
+func wordsBefore(l *render.Layout, k int, word []rune) int {
+	n := 0
+	for _, pr := range l.Prims[:k] {
+		if pr.Kind == render.PText {
+			n += countWord([]rune(pr.Text), word)
+		}
+	}
+	return n
+}

@@ -64,7 +64,7 @@ func (a *App) statusText(gtx layout.Context) string {
 }
 
 func (a *App) caretInfo(gtx layout.Context) layout.Dimensions {
-	row, column := a.editor.CaretPos()
+	row, column := a.caretLine()
 	l := material.Caption(a.th, fmt.Sprintf("Ln %d, Col %d · %d words", row+1, column+1, a.words))
 	l.Color = col.statusFg
 	return l.Layout(gtx)

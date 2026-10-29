@@ -113,6 +113,13 @@ Dutch or German text full of English terms. Compound words (Dutch
 "l'homme") are understood. In the browser the dictionaries are downloaded
 again on each visit.
 
+Click anywhere in the preview to put the editor's caret on that spot in the
+Markdown, scrolled to the editor's top line so you don't have to look for
+it: on the very word you clicked (even inside bold text, links or a
+line the preview wrapped differently), or at the start of a formula or
+image. Handy for fixing a typo you spot while reading. Links in the
+preview still open as before.
+
 The File menu lists the last five files you opened or saved, newest
 first; choosing one opens it (asking first about unsaved changes). The
 list is kept in `settings.json`; a file that has since been deleted is

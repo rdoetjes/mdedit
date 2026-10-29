@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"slices"
 
 	"gioui.org/font"
 	"gioui.org/gesture"
@@ -79,9 +80,7 @@ func (a *App) divider(gtx layout.Context, x, w, h int) {
 
 func (a *App) editorPane(gtx layout.Context) layout.Dimensions {
 	fillRect(gtx, col.editorBg, image.Rectangle{Max: gtx.Constraints.Max})
-	if a.dialog == nil && !gtx.Focused(&a.editor) && a.lastRow < 0 {
-		gtx.Execute(key.FocusCmd{Tag: &a.editor})
-	}
+	a.takeFocus(gtx)
 	dims := layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(a.findBarRow),
 		layout.Flexed(1, a.editorArea),
@@ -112,7 +111,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	e.TextSize = editorTextSize
 	e.LineHeightScale = 1.35
 	e.SelectionColor = col.selectColor
-	a.outline.scrollEditor(gtx, e)
+	a.scrollToTop(gtx, e)
 	dims := e.Layout(gtx)
 	if reorderIMESelection {
 		a.orderIMESelection(gtx)
@@ -124,7 +123,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 
 // followCaret keeps the preview showing the block the caret is in.
 func (a *App) followCaret() {
-	row, _ := a.editor.CaretPos()
+	row, _ := a.caretLine()
 	if row == a.lastRow {
 		return
 	}
@@ -132,4 +131,62 @@ func (a *App) followCaret() {
 		a.preview.EnsureVisible(a.doc.BlockAtLine(row))
 	}
 	a.lastRow = row
+}
+
+// takeFocus gives the editor the keyboard focus when that was asked for
+// (at start-up, after a click in the preview or outline), retrying until
+// the editor has it.
+func (a *App) takeFocus(gtx layout.Context) {
+	switch {
+	case !a.focusEditor || a.dialog != nil:
+	case gtx.Focused(&a.editor):
+		a.focusEditor = false
+	default:
+		gtx.Execute(key.FocusCmd{Tag: &a.editor})
+	}
+}
+
+// caretLine returns the caret's line and column (from 0) in the text.
+// The editor's own CaretPos counts wrapped lines on screen, not lines of
+// the text, so it can't be matched with the document's blocks.
+func (a *App) caretLine() (int, int) {
+	caret, _ := a.editor.Selection()
+	if len(a.lines) == 0 {
+		return 0, caret
+	}
+	i, found := slices.BinarySearch(a.lines, caret)
+	if !found {
+		i--
+	}
+	i = max(i, 0)
+	return i, caret - a.lines[i]
+}
+
+// showAtTop puts the caret at a rune offset, shows that line at the top of
+// the editor (on the next frame) and gives the editor the keyboard focus.
+// The preview isn't scrolled to follow; callers scroll it if they want.
+func (a *App) showAtTop(offset int) {
+	a.editor.SetCaret(offset, offset)
+	a.topOffset = offset
+	a.lastRow = -1 // so followCaret leaves the preview alone
+	a.focusEditor = true
+	a.invalidate()
+}
+
+// scrollToTop carries out showAtTop. Gio's editor scrolls just far enough
+// to show the caret, which leaves a line below the view at the bottom. So
+// the editor is first laid out (and the result thrown away) with the caret
+// at the end, then the caret is moved up to the line, which then ends up
+// at the top (unless the text ends less than a screen below it).
+func (a *App) scrollToTop(gtx layout.Context, e material.EditorStyle) {
+	if a.topOffset < 0 {
+		return
+	}
+	end := a.editor.Len()
+	a.editor.SetCaret(end, end)
+	m := op.Record(gtx.Ops)
+	e.Layout(gtx)
+	m.Stop()
+	a.editor.SetCaret(a.topOffset, a.topOffset)
+	a.topOffset = -1
 }

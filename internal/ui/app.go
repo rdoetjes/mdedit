@@ -74,7 +74,15 @@ type App struct {
 	spell       spellChecker
 	outline     outline
 	recent      []string // recently used files, newest first
-	version     int      // counts text changes, to know when to search again
+	// lines holds the rune offset where each line of the text starts, as
+	// of the last reparse.
+	lines []int
+	// focusEditor asks for the keyboard focus to go (back) to the editor.
+	focusEditor bool
+	// topOffset is a rune offset to show on the editor's top line on the
+	// next frame, or -1 (showAtTop).
+	topOffset int
+	version   int // counts text changes, to know when to search again
 
 	dialog dialog
 	flow   flow
@@ -100,10 +108,11 @@ func New(path string) (*App, error) {
 	th := material.NewTheme()
 	th.Shaper = text.NewShaper(text.WithCollection(append(gofont.Collection(), platformFonts()...)))
 	th.TextSize = 15
-	a := &App{th: th, split: 0.5, lastRow: -1}
+	a := &App{th: th, split: 0.5, lastRow: -1, focusEditor: true, topOffset: -1}
 	a.buildCommands()
 	a.preview = NewPreview(th.Shaper)
 	a.preview.OnLink = a.followLink
+	a.preview.OnSource = a.showSource
 	a.preview.Invalidate = a.invalidate
 	a.editor.WrapPolicy = text.WrapWords
 	a.editor.PaintSelectionWhenUnfocused = true // keep the found match visible
@@ -142,8 +151,9 @@ func (a *App) reparse() {
 	a.doc = mdmodel.Parse([]byte(txt))
 	a.preview.SetDocument(a.doc)
 	runes := []rune(txt)
+	a.lines = lineStarts(runes)
 	a.spell.check(runes, a.doc)
-	a.outline.update(a.doc, runes)
+	a.outline.update(a.doc, a.lines)
 	a.dirty = txt != a.saved
 	a.words = countWords(txt)
 	a.autosave()

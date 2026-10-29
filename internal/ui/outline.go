@@ -7,7 +7,6 @@ import (
 
 	"gioui.org/font"
 	"gioui.org/layout"
-	"gioui.org/op"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -29,9 +28,6 @@ type outline struct {
 	clicks  []widget.Clickable
 	list    widget.List
 	current int // index of the highlighted item, or -1
-	// jump is a rune offset to show at the top of the editor on the next
-	// frame, or -1.
-	jump int
 }
 
 // outlineItem is one heading.
@@ -43,7 +39,7 @@ type outlineItem struct {
 }
 
 func (o *outline) init(a *App, st settings) {
-	o.a, o.current, o.jump = a, -1, -1
+	o.a, o.current = a, -1
 	o.list.Axis = layout.Vertical
 	o.setOpen(st.Outline)
 }
@@ -56,10 +52,10 @@ func (o *outline) setOpen(open bool) {
 	}
 }
 
-// update collects the headings of a newly parsed text.
-func (o *outline) update(doc *mdmodel.Document, text []rune) {
+// update collects the headings of a newly parsed text, whose lines start
+// at the given rune offsets.
+func (o *outline) update(doc *mdmodel.Document, starts []int) {
 	o.items = o.items[:0]
-	starts := lineStarts(text)
 	for i, b := range doc.Blocks {
 		if b.Kind == mdmodel.Heading && b.Line < len(starts) {
 			o.items = append(o.items, outlineItem{level: b.Level, text: headingText(b), block: i, offset: starts[b.Line]})
@@ -122,34 +118,13 @@ func (o *outline) handleClicks(gtx layout.Context) {
 	}
 }
 
-// goTo shows a heading at the top of the editor (on the next frame) and
-// of the preview, and puts the caret on it.
+// goTo shows a heading at the top of the editor and of the preview, with
+// the caret on it.
 func (o *outline) goTo(gtx layout.Context, it outlineItem) {
-	o.jump = it.offset
-	o.a.editor.SetCaret(it.offset, it.offset)
+	o.a.showAtTop(it.offset)
 	if o.a.view != viewEditor {
 		o.a.preview.ScrollToBlock(it.block)
 	}
-	o.a.lastRow = -1 // so followCaret doesn't scroll the preview again
-	o.a.invalidate()
-}
-
-// scrollEditor carries out a jump: Gio's editor scrolls just far enough to
-// show the caret, which leaves a heading below the view at the bottom. So
-// the editor is first laid out (and the result thrown away) with the caret
-// at the end, then the caret is moved up to the heading, which then ends
-// up at the top.
-func (o *outline) scrollEditor(gtx layout.Context, e material.EditorStyle) {
-	if o.jump < 0 {
-		return
-	}
-	end := o.a.editor.Len()
-	o.a.editor.SetCaret(end, end)
-	m := op.Record(gtx.Ops)
-	e.Layout(gtx)
-	m.Stop()
-	o.a.editor.SetCaret(o.jump, o.jump)
-	o.jump = -1
 }
 
 // layout draws the sidebar.
