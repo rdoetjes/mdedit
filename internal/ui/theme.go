@@ -14,7 +14,9 @@ import (
 type settings struct {
 	Theme      string   `json:"theme,omitempty"` // "light" or "dark"; empty follows the system
 	NoSpelling bool     `json:"noSpelling,omitempty"`
-	Words      []string `json:"words,omitempty"` // added to the dictionary
+	Words      []string `json:"words,omitempty"`     // added to the dictionary
+	Languages  []string `json:"languages,omitempty"` // spelling languages; English if none
+	Outline    bool     `json:"outline,omitempty"`   // show the outline sidebar
 }
 
 func loadSettings() settings {

@@ -23,10 +23,18 @@ const maxSuggestions = 5
 // spellChecker underlines misspelt words in the editor and offers
 // corrections for them in the context menu.
 type spellChecker struct {
-	a      *App
-	dict   *spell.Dictionary
-	on     bool
-	misses []spell.Miss
+	a  *App
+	on bool
+	// user holds the words added to the dictionary or ignored.
+	user *spell.Dictionary
+	// languages are the codes chosen; loaded the dictionaries ready so
+	// far; dict combines the user's words and the loaded chosen ones.
+	languages []string
+	loaded    map[string]spell.Speller
+	loading   map[string]bool
+	arrivals  chan dictArrival
+	dict      spell.Set
+	misses    []spell.Miss
 	// tag receives right-clicks on the editor text, in editor coordinates.
 	tag     int
 	boxes   []missBox // where the misses were underlined in the last frame
@@ -41,13 +49,15 @@ type missBox struct {
 	i int // index into misses
 }
 
-// init loads the dictionary and the words the user added to it.
+// init sets up the user's words and starts loading the chosen languages.
 func (s *spellChecker) init(a *App, st settings) {
-	s.a, s.dict = a, spell.English()
-	for _, w := range st.Words {
-		s.dict.Add(w)
-	}
+	s.a = a
+	s.user = spell.New(st.Words...)
+	s.loaded = make(map[string]spell.Speller)
+	s.loading = make(map[string]bool)
+	s.arrivals = make(chan dictArrival, 8)
 	s.setOn(!st.NoSpelling)
+	s.setLanguages(st.languages(), false)
 }
 
 func (s *spellChecker) setOn(on bool) {
@@ -58,17 +68,18 @@ func (s *spellChecker) setOn(on bool) {
 	}
 }
 
-// check finds the misspelt words of the editor text.
-func (s *spellChecker) check(text string, doc *mdmodel.Document) {
+// check finds the misspelt words of the editor text, once a dictionary of
+// the chosen languages is ready.
+func (s *spellChecker) check(text []rune, doc *mdmodel.Document) {
 	s.misses = nil
-	if s.on {
-		s.misses = spell.Check(s.dict, []rune(text), doc)
+	if s.on && len(s.dict) > 1 {
+		s.misses = spell.Check(s.dict, text, doc)
 	}
 }
 
 // recheck checks the editor text again, after the dictionary changed.
 func (s *spellChecker) recheck() {
-	s.check(s.a.editor.Text(), s.a.doc)
+	s.check([]rune(s.a.editor.Text()), s.a.doc)
 }
 
 // underline draws a wavy line under the misspelt words; call it right
@@ -193,7 +204,7 @@ type learnWord struct {
 }
 
 func (l learnWord) run(layout.Context) {
-	l.s.dict.Add(l.word)
+	l.s.user.Add(l.word)
 	l.s.recheck()
 	if !l.save {
 		return

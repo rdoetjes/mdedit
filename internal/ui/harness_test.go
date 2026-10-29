@@ -27,6 +27,16 @@ type harness struct {
 }
 
 func newHarness(t *testing.T, path string) *harness {
+	resetSettings()
+	return startHarness(t, path)
+}
+
+// restart starts the program again with the settings saved so far.
+func (h *harness) restart() *harness {
+	return startHarness(h.t, "")
+}
+
+func startHarness(t *testing.T, path string) *harness {
 	a, err := New(path)
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +73,17 @@ func (h *harness) rightClick(x, y float32) {
 	at := f32.Pt(x, y)
 	h.router.Queue(
 		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Buttons: pointer.ButtonSecondary, Position: at},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: at},
+	)
+	h.frame()
+	h.frame()
+}
+
+// click clicks the primary mouse button at (x, y).
+func (h *harness) click(x, y float32) {
+	at := f32.Pt(x, y)
+	h.router.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Buttons: pointer.ButtonPrimary, Position: at},
 		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: at},
 	)
 	h.frame()

@@ -27,7 +27,13 @@ func (d *Dictionary) Suggest(word string, n int) []string {
 	if len(target) == 0 {
 		return nil
 	}
-	var found []candidate
+	found := penaliseCase(d.candidates(nil, target), word)
+	slices.SortFunc(found, byScore)
+	return matchCase(word, found, n)
+}
+
+// candidates appends the words within reach of target (in lower case).
+func (d *Dictionary) candidates(found []candidate, target []rune) []candidate {
 	var rows [3][]int
 	for l := max(len(target)-2, 1); l <= len(target)+2 && l < len(d.byLen); l++ {
 		for i := range rows {
@@ -35,8 +41,7 @@ func (d *Dictionary) Suggest(word string, n int) []string {
 		}
 		found = collect(found, target, d.byLen[l], rows)
 	}
-	slices.SortFunc(found, byScore)
-	return matchCase(word, found, n)
+	return found
 }
 
 // collect appends the entries within reach of target. The entries are all
@@ -45,14 +50,40 @@ func collect(found []candidate, target []rune, entries []entry, rows [3][]int) [
 	for i := range entries {
 		e := &entries[i]
 		cost := distance(target, e.lower, rows)
-		if cost > maxCost {
-			continue
+		if cost <= maxCost {
+			found = append(found, candidate{e.word, score(cost, e.rank, e.lower[0] != target[0])})
 		}
-		score := 2*cost + int(e.rank)
-		if e.lower[0] != target[0] {
-			score += costFirstRune
+	}
+	return found
+}
+
+// score ranks a candidate: lower is likelier.
+func score(cost int, rank uint8, otherFirst bool) int {
+	s := 2*cost + int(rank)
+	if otherFirst {
+		s += costFirstRune
+	}
+	return s
+}
+
+// scoreWord scores any word against target (in lower case).
+func scoreWord(target []rune, word string) int {
+	lower := []rune(strings.ToLower(word))
+	n := len(lower) + 1
+	rows := [3][]int{make([]int, n), make([]int, n), make([]int, n)}
+	return score(distance(target, lower, rows), 0, len(lower) == 0 || lower[0] != target[0])
+}
+
+// penaliseCase makes names less likely corrections of a word typed in
+// lower case.
+func penaliseCase(found []candidate, word string) []candidate {
+	if hasInnerUpper([]rune(word)) {
+		return found
+	}
+	for i := range found {
+		if hasInnerUpper([]rune(found[i].word)) {
+			found[i].score += costTwist
 		}
-		found = append(found, candidate{e.word, score})
 	}
 	return found
 }

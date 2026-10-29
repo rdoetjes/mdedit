@@ -98,9 +98,25 @@ most likely corrections at the top of the menu; click one to replace the
 word. Add to Dictionary remembers the word for good (in `settings.json`),
 Ignore until mdedit quits. Code, maths, HTML, link targets, URLs, file
 names, words with digits, acronyms in capitals and camelCase words aren't
-checked. Edit → Hide Spelling Errors turns the checking off. The dictionary
-is English (American and British spellings), from
-[SCOWL](http://wordlist.aspell.net), built into the program.
+checked. Edit → Hide Spelling Errors turns the checking off.
+
+English (American and British spellings, from
+[SCOWL](http://wordlist.aspell.net)) is built in. Edit → Spelling
+Languages… adds about 60 more, such as Dutch, German, French and Spanish:
+tick them and click OK, and the ones not on your computer yet are
+downloaded in the background (the LibreOffice/Hunspell dictionaries, via
+[wooorm/dictionaries](https://github.com/wooorm/dictionaries); each has its
+own licence). They are kept in `dictionaries/` next to `settings.json`. You
+can tick several: a word is correct if any of them knows it, which suits
+Dutch or German text full of English terms. Compound words (Dutch
+"spellingcontrole", German "Rechtschreibprüfung") and elisions (French
+"l'homme") are understood. In the browser the dictionaries are downloaded
+again on each visit.
+
+View → Show Outline (Ctrl+Shift+O) opens a sidebar listing the document's
+headings, indented by level. Click one to show it at the top of the editor
+and the preview; the heading of the section you are typing in is
+highlighted. The sidebar stays open (or closed) the next time.
 
 ### YouTube videos
 

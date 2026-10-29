@@ -27,6 +27,7 @@ type contextMenu struct {
 // layout draws one frame.
 func (a *App) layout(gtx layout.Context) {
 	a.handleInput(gtx)
+	a.spell.handleArrivals()
 	a.handleEditorEvents(gtx)
 	a.spell.handleClick(gtx)
 	a.handleRightClick(gtx)
@@ -174,7 +175,7 @@ func (a *App) layoutContextMenu(gtx layout.Context) {
 // body lays out the panes and watches for right-clicks over them, letting
 // the events through to the editor and preview as well.
 func (a *App) body(gtx layout.Context) layout.Dimensions {
-	dims := a.panes(gtx)
+	dims := a.mainArea(gtx)
 	area := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
 	pass := pointer.PassOp{}.Push(gtx.Ops)
 	event.Op(gtx.Ops, &a.ctx.tag)

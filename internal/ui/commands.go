@@ -85,7 +85,7 @@ type commands struct {
 	find, replace            *command
 	video                    *command
 	theme                    *command
-	spelling                 *command
+	spelling, outline        *command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -124,6 +124,7 @@ func (a *App) buildSharedCommands() {
 	c.video = newCommand("YouTube Video…", "", 0, a.cmdVideo)
 	c.theme = newCommand("Dark Theme", "D", key.ModShift, a.cmdToggleTheme)
 	c.spelling = newCommand("Hide Spelling Errors", "", 0, a.cmdToggleSpelling)
+	c.outline = newCommand("Show Outline", "O", key.ModShift, a.cmdToggleOutline)
 	c.find = newCommand("Find…", "F", 0, a.cmdFind)
 	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
@@ -171,6 +172,7 @@ func (a *App) editMenu() *menu {
 		newCommand("Find Previous", "G", key.ModShift, a.cmdFindPrev),
 		nil,
 		a.cmds.spelling,
+		newCommand("Spelling Languages…", "", 0, a.cmdLanguages),
 	}}
 }
 
@@ -220,6 +222,7 @@ func (a *App) viewMenu() *menu {
 		newCommand("Editor Only", "", 0, viewChoice{a, viewEditor}.run),
 		newCommand("Preview Only", "", 0, viewChoice{a, viewPreview}.run),
 		nil,
+		a.cmds.outline,
 		a.cmds.theme,
 		nil,
 		newCommand("Cycle Views", "/", 0, a.cmdCycleView),

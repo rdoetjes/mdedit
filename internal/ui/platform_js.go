@@ -211,6 +211,11 @@ func openURL(url string) error {
 	return nil
 }
 
+// dictionaryDir is where downloaded spelling dictionaries are kept: in
+// memory (internal/vfs), so the browser downloads them once per visit; its
+// HTTP cache usually makes that quick.
+func dictionaryDir() string { return "/dictionaries" }
+
 func readSettings() ([]byte, error) {
 	s, ok := getItem(keySettings)
 	if !ok {

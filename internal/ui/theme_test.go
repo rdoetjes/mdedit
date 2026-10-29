@@ -26,7 +26,7 @@ func TestThemeToggle(t *testing.T) {
 	if loadSettings().Theme != "dark" {
 		t.Error("dark theme not saved")
 	}
-	if next := newHarness(t, ""); !next.a.dark {
+	if next := h.restart(); !next.a.dark {
 		t.Error("the next start isn't dark")
 	}
 	h.press("D", key.ModShortcut|key.ModShift)

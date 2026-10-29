@@ -112,6 +112,7 @@ func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	e.TextSize = editorTextSize
 	e.LineHeightScale = 1.35
 	e.SelectionColor = col.selectColor
+	a.outline.scrollEditor(gtx, e)
 	dims := e.Layout(gtx)
 	if reorderIMESelection {
 		a.orderIMESelection(gtx)

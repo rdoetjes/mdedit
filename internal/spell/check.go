@@ -19,7 +19,7 @@ type Miss struct {
 // inline code and maths, HTML tags, link targets, URLs, file names, words
 // with digits or underscores, words in capitals (acronyms) and words with
 // capitals inside (camelCase, product names).
-func Check(d *Dictionary, text []rune, doc *mdmodel.Document) []Miss {
+func Check(d Speller, text []rune, doc *mdmodel.Document) []Miss {
 	c := checker{d: d, text: text, skip: skippedLines(doc)}
 	c.run()
 	return c.misses
@@ -47,7 +47,7 @@ func skippedLines(doc *mdmodel.Document) []lines {
 
 // checker walks through a text collecting misspellings.
 type checker struct {
-	d      *Dictionary
+	d      Speller
 	text   []rune
 	skip   []lines
 	misses []Miss

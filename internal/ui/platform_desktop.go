@@ -144,6 +144,9 @@ func defaultConfigDir() string {
 	return filepath.Join(dir, "mdedit")
 }
 
+// dictionaryDir is where downloaded spelling dictionaries are kept.
+func dictionaryDir() string { return filepath.Join(configDir, "dictionaries") }
+
 func readSettings() ([]byte, error) {
 	return os.ReadFile(filepath.Join(configDir, "settings.json"))
 }

@@ -58,6 +58,7 @@
     - [9.6 internal/tex — maths](#96-internaltex--maths)
     - [9.7 internal/imgcache and internal/youtube](#97-internalimgcache-and-internalyoutube)
     - [9.8 internal/spell — spell checking](#98-internalspell--spell-checking)
+    - [9.9 The outline sidebar (ui/outline.go)](#99-the-outline-sidebar-uioutlinego)
   - [10. Recipes: where to add things](#10-recipes-where-to-add-things)
     - [Add an editing command (menu item, shortcut, maybe a toolbar icon)](#add-an-editing-command-menu-item-shortcut-maybe-a-toolbar-icon)
     - [Add a dialog](#add-a-dialog)
@@ -136,7 +137,7 @@ That is why the preview and the PDF can't drift apart.
 | `internal/imgcache` | Downloads YouTube stills into a cache (async for the preview, sync for PDF) | youtube, vfs |
 | `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§8) | — |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
-| `internal/spell` | Spell checking: the embedded English word list, finding misspelt words in Markdown, suggestions | mdmodel |
+| `internal/spell` | Spell checking: the embedded English word list, a Hunspell dictionary reader, downloading dictionaries, finding misspelt words in Markdown, suggestions | mdmodel |
 | `internal/lint` | A test enforcing the code style (see §12) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 | `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
@@ -1682,6 +1683,8 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `findbar.go`, `findbar_view.go` | Search/replace logic and view, match highlighting |
 | `ime.go` | Works around Gio's browser text input with selections (§11, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
+| `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
+| `outline.go` | The outline sidebar: headings, following the caret, jumping to a heading |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
 | `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed` |
@@ -1892,6 +1895,43 @@ over the editor, so a right-click arrives in editor coordinates;
 box under the pointer, and `openContextMenu` puts that word's corrections
 at the top of the menu. A correction is an ordinary edit
 (`edit.ReplaceWord`), so it is one undo step.
+
+**Other languages** are Hunspell dictionaries (`hunspell.go` and the files
+it names), downloaded by `Download` from the catalogue in `catalog.go`.
+`LoadHunspell` reads the `.aff` file (affix rules, flags, compound
+settings) and the `.dic` file (stems with flags). Words are checked by
+*taking affixes off* rather than generating every form: `forms` tries each
+suffix and prefix whose added text the word ends or starts with, undoes it,
+and looks the stem up with the right flag — including a second suffix and a
+prefix-suffix pair (`lookup.go`). If that fails, `compoundFrom` tries every
+split into parts allowed at the start, middle and end of a compound
+(Dutch, German, Swedish …), and `ruleCompound` the COMPOUNDRULE patterns
+(numbers like "21st"); `elision` accepts French "l'homme" as "l'" +
+"homme". Results are cached per word. Suggestions combine the REP table of
+common mistakes, single edits that are words, and stems within two edits.
+The directives supported are listed on the `Hunspell` type; the rest are
+ignored, which can only make it accept a little too much. To test against
+real dictionaries, put `<code>.aff`/`<code>.dic` pairs in a folder and run
+`MDEDIT_DICTS=folder go test ./internal/spell -run Real`.
+
+`Speller` is what `Check` uses; `Set` combines several, so the window
+checks with the user's own words plus every chosen language
+(`ui/languages.go: spellChecker.combine`). Dictionaries load on a
+goroutine (`loadDictionary`: from `internal/vfs`, else downloaded and
+stored there) and arrive through a channel that `handleArrivals` empties
+each frame.
+
+### 9.9 The outline sidebar (`ui/outline.go`)
+
+`App.reparse` gives `outline.update` the headings of the parsed document
+and the rune offset of each one's line. `mainArea` (called from `body`)
+puts the sidebar left of the panes when it is open. Each frame `follow`
+highlights the last heading at or before the caret. Clicking one sets
+`outline.jump`; on the editor's next layout `scrollEditor` moves the caret
+to the end, lays the editor out and throws the result away, then moves the
+caret to the heading — Gio's editor only scrolls as far as needed to show
+the caret, so coming from below puts the heading at the top. The preview
+uses `ScrollToBlock`.
 
 ---
 

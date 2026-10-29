@@ -167,6 +167,28 @@ func (s *shooter) contentScenes() {
 	s.shot("toc.png")
 	s.h.a.ctx.open = false
 	s.spellingScene()
+	s.outlineScenes()
+}
+
+// outlineScenes shows the outline sidebar on a long document, and the
+// spelling languages dialog.
+func (s *shooter) outlineScenes() {
+	a := s.h.a
+	src, err := os.ReadFile("../../HOW_IT_WORKS.md")
+	if err != nil {
+		s.h.t.Fatal(err)
+	}
+	s.h.showOutline()
+	s.h.setText(string(src), 0, 0)
+	a.outline.goTo(layout.Context{}, a.outline.items[12])
+	s.shot("outline.png")
+	a.setDark(true)
+	s.shot("dark-outline.png")
+	a.setDark(false)
+	a.cmdToggleOutline(layout.Context{})
+	a.cmdLanguages(layout.Context{})
+	s.shot("dialog-languages.png")
+	a.dialog = nil
 }
 
 // spellingScene shows misspelt words underlined and the corrections for
