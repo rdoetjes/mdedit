@@ -33,33 +33,42 @@
       - [Step C — every screen pixel looks up its colour](#step-c--every-screen-pixel-looks-up-its-colour)
       - [Paths or pixels: why both exist](#paths-or-pixels-why-both-exist)
     - [6.11 The PDF: the viewer rasterises](#611-the-pdf-the-viewer-rasterises)
-  - [7. Images and YouTube videos](#7-images-and-youtube-videos)
-    - [7.1 How they are written](#71-how-they-are-written)
-    - [7.2 Inserting a video](#72-inserting-a-video)
-    - [7.3 Parsing: an image block](#73-parsing-an-image-block)
-    - [7.4 Finding the pixels: local files and the download cache](#74-finding-the-pixels-local-files-and-the-download-cache)
-    - [7.5 Layout: size, alignment, placeholder, play button](#75-layout-size-alignment-placeholder-play-button)
-    - [7.6 The preview: decode, cache, arrive late, click](#76-the-preview-decode-cache-arrive-late-click)
-    - [7.7 The PDF](#77-the-pdf)
-    - [7.8 When an image doesn't show](#78-when-an-image-doesnt-show)
-  - [8. The browser version (WebAssembly)](#8-the-browser-version-webassembly)
-    - [8.1 The platform seam in internal/ui](#81-the-platform-seam-in-internalui)
-    - [8.2 Asynchronous results: picker, file reading, PDF export](#82-asynchronous-results-picker-file-reading-pdf-export)
-    - [8.3 Storage](#83-storage)
-    - [8.4 The web page and keys](#84-the-web-page-and-keys)
-    - [8.5 Building, serving, installing](#85-building-serving-installing)
-    - [8.6 Adding something that touches the outside world](#86-adding-something-that-touches-the-outside-world)
-  - [9. The layers in detail](#9-the-layers-in-detail)
-    - [9.1 internal/ui — the window](#91-internalui--the-window)
-    - [9.2 internal/edit — editing commands as pure functions](#92-internaledit--editing-commands-as-pure-functions)
-    - [9.3 internal/mdmodel — Markdown to blocks](#93-internalmdmodel--markdown-to-blocks)
-    - [9.4 internal/render — blocks to primitives](#94-internalrender--blocks-to-primitives)
-    - [9.5 internal/pdfout — primitives to PDF](#95-internalpdfout--primitives-to-pdf)
-    - [9.6 internal/tex — maths](#96-internaltex--maths)
-    - [9.7 internal/imgcache and internal/youtube](#97-internalimgcache-and-internalyoutube)
-    - [9.8 internal/spell — spell checking](#98-internalspell--spell-checking)
-    - [9.9 The outline sidebar (ui/outline.go)](#99-the-outline-sidebar-uioutlinego)
-  - [10. Recipes: where to add things](#10-recipes-where-to-add-things)
+  - [7. From a click back to the Markdown](#7-from-a-click-back-to-the-markdown)
+    - [7.1 The preview keeps its display list](#71-the-preview-keeps-its-display-list)
+    - [7.2 Which block, and where in it](#72-which-block-and-where-in-it)
+    - [7.3 Hit-testing: which text was clicked](#73-hit-testing-which-text-was-clicked)
+    - [7.4 Measuring: which character](#74-measuring-which-character)
+    - [7.5 From a character to a word, and which one](#75-from-a-character-to-a-word-and-which-one)
+    - [7.6 Back to the source](#76-back-to-the-source)
+    - [7.7 Showing it: top line, focus, a still preview](#77-showing-it-top-line-focus-a-still-preview)
+    - [7.8 Where it can't know, and a trap](#78-where-it-cant-know-and-a-trap)
+  - [8. Images and YouTube videos](#8-images-and-youtube-videos)
+    - [8.1 How they are written](#81-how-they-are-written)
+    - [8.2 Inserting a video](#82-inserting-a-video)
+    - [8.3 Parsing: an image block](#83-parsing-an-image-block)
+    - [8.4 Finding the pixels: local files and the download cache](#84-finding-the-pixels-local-files-and-the-download-cache)
+    - [8.5 Layout: size, alignment, placeholder, play button](#85-layout-size-alignment-placeholder-play-button)
+    - [8.6 The preview: decode, cache, arrive late, click](#86-the-preview-decode-cache-arrive-late-click)
+    - [8.7 The PDF](#87-the-pdf)
+    - [8.8 When an image doesn't show](#88-when-an-image-doesnt-show)
+  - [9. The browser version (WebAssembly)](#9-the-browser-version-webassembly)
+    - [9.1 The platform seam in internal/ui](#91-the-platform-seam-in-internalui)
+    - [9.2 Asynchronous results: picker, file reading, PDF export](#92-asynchronous-results-picker-file-reading-pdf-export)
+    - [9.3 Storage](#93-storage)
+    - [9.4 The web page and keys](#94-the-web-page-and-keys)
+    - [9.5 Building, serving, installing](#95-building-serving-installing)
+    - [9.6 Adding something that touches the outside world](#96-adding-something-that-touches-the-outside-world)
+  - [10. The layers in detail](#10-the-layers-in-detail)
+    - [10.1 internal/ui — the window](#101-internalui--the-window)
+    - [10.2 internal/edit — editing commands as pure functions](#102-internaledit--editing-commands-as-pure-functions)
+    - [10.3 internal/mdmodel — Markdown to blocks](#103-internalmdmodel--markdown-to-blocks)
+    - [10.4 internal/render — blocks to primitives](#104-internalrender--blocks-to-primitives)
+    - [10.5 internal/pdfout — primitives to PDF](#105-internalpdfout--primitives-to-pdf)
+    - [10.6 internal/tex — maths](#106-internaltex--maths)
+    - [10.7 internal/imgcache and internal/youtube](#107-internalimgcache-and-internalyoutube)
+    - [10.8 internal/spell — spell checking](#108-internalspell--spell-checking)
+    - [10.9 The outline sidebar (ui/outline.go)](#109-the-outline-sidebar-uioutlinego)
+  - [11. Recipes: where to add things](#11-recipes-where-to-add-things)
     - [Add an editing command (menu item, shortcut, maybe a toolbar icon)](#add-an-editing-command-menu-item-shortcut-maybe-a-toolbar-icon)
     - [Add a dialog](#add-a-dialog)
     - [Add a Markdown block type](#add-a-markdown-block-type)
@@ -67,11 +76,11 @@
     - [Add a new primitive kind](#add-a-new-primitive-kind)
     - [Add a TeX command](#add-a-tex-command)
     - [Add a keyboard behaviour inside the editor](#add-a-keyboard-behaviour-inside-the-editor)
-  - [11. Finding bugs](#11-finding-bugs)
+  - [12. Finding bugs](#12-finding-bugs)
     - [Symptom → where to look](#symptom--where-to-look)
     - [Tools](#tools)
     - [Gotchas](#gotchas)
-  - [12. Code style](#12-code-style)
+  - [13. Code style](#13-code-style)
 
 <!-- /toc -->
 
@@ -127,7 +136,7 @@ That is why the preview and the PDF can't drift apart.
 | Package | Responsibility | Depends on |
 |---|---|---|
 | `cmd/mdedit` | `main`: flags, `-pdf` export, opens the window (desktop and browser) | ui, mdmodel, pdfout |
-| `cmd/mdedit-web` | Static web server for the browser version (§8) | — |
+| `cmd/mdedit-web` | Static web server for the browser version (§9) | — |
 | `internal/ui` | Everything you see and click: window, editor, preview painter, menus, toolbar, dialogs, find bar, keys | edit, mdmodel, render, pdfout, tex, imgcache, youtube |
 | `internal/edit` | Formatting commands as **pure functions** on `State` (text + selection): bold, lists, headings, align, tables, TOC, search/replace, Enter/Tab | mdmodel (for TOC), youtube |
 | `internal/mdmodel` | Parses Markdown into a flat list of styled `Block`s; maths syntax; syntax highlighting | goldmark, chroma, youtube |
@@ -135,13 +144,13 @@ That is why the preview and the PDF can't drift apart.
 | `internal/tex` | TeX maths typesetter; embeds the STIX Two Math font; glyph outlines | x/image/font/sfnt |
 | `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, vfs, fpdf |
 | `internal/imgcache` | Downloads YouTube stills into a cache (async for the preview, sync for PDF) | youtube, vfs |
-| `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§8) | — |
+| `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§9) | — |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
 | `internal/spell` | Spell checking: the embedded English word list, a Hunspell dictionary reader, downloading dictionaries, finding misspelt words in Markdown, suggestions | mdmodel |
-| `internal/lint` | A test enforcing the code style (see §12) | — |
+| `internal/lint` | A test enforcing the code style (see §13) | — |
 | `tools/mkicon` | Draws the application icon: hicolor PNGs, or a macOS iconset with `-macos` | x/image/vector |
 | `tools/glyphdump` | Prints a character's glyph number, stored points and curve segments (§6) | go-text |
-| `web/`, `assets/freebsd/` | The web page around the browser version; the FreeBSD rc.d script for `mdedit-web` (§8) | — |
+| `web/`, `assets/freebsd/` | The web page around the browser version; the FreeBSD rc.d script for `mdedit-web` (§9) | — |
 
 Rule of thumb: **lower layers never import higher ones.** If you find
 yourself wanting `render` to import `ui`, the code belongs somewhere else.
@@ -940,7 +949,7 @@ return &imageEntry{op: paint.NewImageOp(img), size: img.Bounds().Size()}
 
 A 1280 × 720 YouTube still is 921,600 samples, about 3.7 MB once
 decoded (the JPEG on disk is a few hundred KB). Where the image comes from
-and how big it is drawn is §7; here it arrives as
+and how big it is drawn is §8; here it arrives as
 `Prim{Kind: PImage, X, Y, W, H, URL}` — the box to fill, in device units.
 
 #### Step A — uploaded once as a texture
@@ -1021,7 +1030,7 @@ down. `texture()` is answered by the GPU's **texture unit**, hardware made
 for this: it maps (u, v) into the image and, with linear filtering,
 **blends the nearest samples by distance** rather than picking one.
 
-A worked pixel: the 1280 × 720 still drawn at 528 × 297 (§7.5), screen
+A worked pixel: the 1280 × 720 still drawn at 528 × 297 (§8.5), screen
 pixel (100, 50) measured from the image's corner, sampled at its centre:
 
 ```
@@ -1083,15 +1092,153 @@ needs, which is why PDF text stays sharp at any zoom.
   filled path, `pdfout/fonts.go: fillGlyph` → `pathSegment` (`MoveTo`,
   `LineTo`, `CurveTo`; fill rule nonzero, the same idea as §6.8).
 - **Images** are embedded as files (PNG, JPEG, GIF) and placed with a
-  size; the viewer scales them (§7.7).
+  size; the viewer scales them (§8.7).
 
 Measuring for the PDF uses fpdf's widths (`pdfout/fonts.go: measure`),
 taken from the same `hmtx` advances, so lines break at the same words as
 on screen.
 
+## 7. From a click back to the Markdown
+
+§6 followed a character down to pixels. Clicking in the preview goes the
+other way: the user points at pixels and the editor's caret should land on
+the character in the Markdown source that they came from. The screen only
+holds pixels, so mdedit never asks the screen; it asks the list of drawing
+instructions the pixels were painted from, which still holds the text. A
+web browser finds what you clicked the same way.
+
+```
+Markdown ──parse──▶ Block ──render──▶ Prim{Text:"quick brown fox", X, Y, W} ──paint──▶ pixels
+   ▲                                     │ kept in Preview.cache
+   │ sourceOffset                        │ hit-test, measure
+   └──── "the 2nd 'fox' in block 1, 1 character in" ◀─ click (x, y)
+```
+
+The code is in `ui/preview.go` (from the click to a description of it) and
+`ui/sourcepos.go` (from that description to the source, and showing it).
+
+### 7.1 The preview keeps its display list
+
+`render` lays out each block into a `render.Layout`: a list of positioned
+primitives (§2). A run of text is one primitive:
+
+```go
+Prim{Kind: PText, Text: "quick brown fox", X: 120, Y: 344 /* baseline */, W: 131, Font: …, Size: 16}
+```
+
+Bold, italics, a link or a line the preview wrapped each start a new
+primitive. The painter turns primitives into pixels (`ui/paint.go`), but
+the preview keeps the layouts in `Preview.cache` (one per block, dropped
+when the document or the width changes), so they are still there when the
+user clicks.
+
+### 7.2 Which block, and where in it
+
+Every block in the preview's list registers its own click area
+(`Preview.block`), so Gio reports a click with the block's index and a
+position relative to the block's top-left corner. `Preview.handleClicks`
+subtracts the left margin of the text column (`p.ox`), which puts the
+position in the coordinates of the block's primitives. `Preview.clicked`
+then decides: on a link (`linkAt`) it follows the link, as before;
+anywhere else it describes the click with `sourceClick` and hands that to
+`OnSource`, which the window sets to `App.showSource`.
+
+### 7.3 Hit-testing: which text was clicked
+
+`textPrimAt` looks at the text primitives whose line holds the click: from
+the top of the letters (the baseline minus the font size) to a little
+below the baseline, for descenders. Of those it takes the one under the
+pointer, or the nearest one on that line when the click was just beside
+the text (after the end of a line, in a gap between runs). If there is
+none — the click was on maths, an image, a rule or empty space — the click
+is described by its block alone.
+
+### 7.4 Measuring: which character
+
+A primitive knows where it starts and how wide it is, not where each of its
+letters is. `Preview.charIndex` measures the run's text one character more
+at a time — "q", "qu", "qui" … — until the width passes the click. It
+measures with `textPainter.measure`, the same function (same shaper, font
+and size) that the layout used to place the text and the painter to draw
+it, so the measurements agree with what is on screen; and they are cached,
+so this costs next to nothing.
+
+### 7.5 From a character to a word, and which one
+
+A character position can't be looked up in the source directly: the
+preview's text has no `**`, `[…](url)`, escapes or source line breaks, so
+the offsets differ. Whole words survive all of those, so the click is
+turned into a word and an occurrence:
+
+1. `wordAt` grows the character position to the letters and digits around
+   it ("fox"); on a space or punctuation it takes the next word, or else
+   the one before. `Offset` is how far into the word the click was.
+2. `wordsBefore` counts how often that word occurs, as a whole word, in the
+   block's text primitives before the clicked one, and `countWord` how often
+   earlier in the clicked one. That gives `Nth`.
+
+The result is a `SourceClick`: "the 2nd *fox* in block 1, 1 character in",
+or just "block 3" when there was no word.
+
+### 7.6 Back to the source
+
+`sourceOffset` turns a `SourceClick` into a rune offset in the editor's
+text:
+
+1. `blockRange` takes the block's source lines: from `Block.Line` to the
+   line the next block starts on, using the line starts that `App.reparse`
+   records (`App.lines`).
+2. `wordOccurrences` finds the whole-word occurrences of the word in those
+   lines; the `Nth` one is the answer, plus `Offset`.
+3. If the source has fewer occurrences than counted (the preview showed
+   text the source spells differently), the last one is taken; if the word
+   isn't there at all, or there was no word, the start of the block. For a
+   maths block that is the formula's line, as `Block.Line` points at the
+   first line inside the `$$`.
+
+### 7.7 Showing it: top line, focus, a still preview
+
+`App.showSource` passes the offset to `App.showAtTop` (`ui/panes.go`),
+which the outline sidebar uses too:
+
+- **The caret goes to the editor's top line.** Gio's editor scrolls only as
+  far as it must to show the caret, which would leave a spot further down
+  at the bottom edge, to be looked for. So `scrollToTop`, on the editor's
+  next layout, first puts the caret at the end of the text and lays the
+  editor out once without drawing it, then moves the caret to the target:
+  coming from below, the editor scrolls up just far enough, which leaves
+  the target on the top line. (Near the end of the text it can't get
+  there; the editor doesn't scroll past its last line.)
+- **The editor gets the keyboard focus** (`focusEditor`, carried out by
+  `takeFocus`, which retries until the editor has it), so typing fixes the
+  typo at once — even if the find bar had the focus.
+- **The preview stays put.** Normally `followCaret` scrolls the preview to
+  the block holding the caret; `showAtTop` sets `lastRow` to -1 so that it
+  doesn't, since the preview already shows what was clicked.
+
+### 7.8 Where it can't know, and a trap
+
+- Maths is drawn as glyph outlines (`PGlyph`, §6.9) without text, and
+  images have none either; those clicks go to the start of the block.
+- A word that styling splits in the middle (`**fo**x`) is two primitives;
+  each half is matched as a word of its own, which the source doesn't have
+  in that form, so the caret goes to the start of the block.
+- **The caret's line is not `editor.CaretPos()`.** Gio's `CaretPos` counts
+  wrapped lines on screen, not lines of the text. `followCaret` and the
+  status bar used it as a source line, and with long wrapped paragraphs
+  they pointed many lines too far: the preview jumped away right after a
+  click. Anything matched with `Block.Line` must use `App.caretLine()`,
+  which finds the caret in `App.lines`.
+
+Tests: `ui/sourcepos_test.go` covers finding the word under a click, the
+mapping to the source (bold, a repeated word inside a link after a line
+break, a heading, a formula, a word that isn't in the source), real clicks
+through the test harness, a click on a link, and the caret line, top line,
+focus and still preview with wrapped paragraphs.
+
 ---
 
-## 7. Images and YouTube videos
+## 8. Images and YouTube videos
 
 Images and videos take the same road as text — Markdown → `Block` →
 `Layout` → painter — with two extra problems: the pixels live **somewhere
@@ -1113,7 +1260,7 @@ Layout{PImage | placeholder PRect, play button PRect + PPoly, PLink}
       └─▶ pdfout/draw.go: drawImage (embedded file)      click → PDF link annotation
 ```
 
-### 7.1 How they are written
+### 8.1 How they are written
 
 mdedit has no video syntax of its own; it uses the notation GitHub
 READMEs use, so documents look the same on GitHub:
@@ -1139,7 +1286,7 @@ shown as its alt text, `[image: Alt]`, in italics and clickable
 (`mdmodel/inline.go: inlineRun.image`); drawing pictures inside lines of
 text would complicate line breaking for little gain.
 
-### 7.2 Inserting a video
+### 8.2 Inserting a video
 
 Insert → YouTube Video… (or the toolbar button) opens
 `ui/videodialog.go: VideoDialog`, which asks for a video ID and a title.
@@ -1178,7 +1325,7 @@ func (a *App) videoChosen(id, title string) {
 `youtube.Markdown(id, title)` on a line of its own (`edit/edit.go:
 ownLine`). From there it is ordinary typing: `reparse`, and §5.
 
-### 7.3 Parsing: an image block
+### 8.3 Parsing: an image block
 
 goldmark parses `![Alt](src)` as an `ast.Image` inside a paragraph, and a
 linked image as an `ast.Image` inside an `ast.Link`. `mdmodel/parse.go:
@@ -1228,7 +1375,7 @@ Note what decides `Video`: the **link**, not the image. Any picture
 linked to a YouTube video gets the video treatment (66 % width, play
 button); a YouTube still without a link is an ordinary image.
 
-### 7.4 Finding the pixels: local files and the download cache
+### 8.4 Finding the pixels: local files and the download cache
 
 `render/images.go: ResolveImage` turns `Src` into a file path on disk,
 for both the preview and the PDF:
@@ -1288,13 +1435,13 @@ Both share the same rules (`imgcache.go: start`, `finish`, `download`,
 - **Atomic:** the file is written as `….tmp` and renamed, so a reader
   never sees half an image.
 
-### 7.5 Layout: size, alignment, placeholder, play button
+### 8.5 Layout: size, alignment, placeholder, play button
 
 `render/image.go: Ctx.image` turns the block into prims. The device tells
 it the image's size in pixels through `Ctx.ImageSize`:
 
 - **Preview** (`ui/preview.go: imageSize`): decodes the image through
-  `Preview.image` (§7.6) — it needs the pixels anyway.
+  `Preview.image` (§8.6) — it needs the pixels anyway.
 - **PDF** (`pdfout/pdf.go: imageSize`): `imgcache.Get` for a still, then
   `render.ImageFileSize`, which reads only the file header
   (`image.DecodeConfig`), cached by path and modification time. Formats
@@ -1374,7 +1521,7 @@ The play button is not an icon file: it is a red rounded rectangle and a
 white triangle, drawn like any other shape (§6.8), so it is sharp at
 every size.
 
-### 7.6 The preview: decode, cache, arrive late, click
+### 8.6 The preview: decode, cache, arrive late, click
 
 `ui/images.go: Preview.image` is called both by layout (for the size)
 and by `paintImage` (for the pixels):
@@ -1449,7 +1596,7 @@ func (a *App) followLink(url string) {
 The hand cursor over the still comes from the same `PLink`
 (`ui/paint.go: linkCursor`).
 
-### 7.7 The PDF
+### 8.7 The PDF
 
 The PDF uses the same `Block` and the same `Ctx.image`, with
 `VideoControls` off, so a video is just its still, linked to the watch
@@ -1472,7 +1619,7 @@ page.
   still in a PDF viewer opens the video too. A `#heading` link becomes an
   internal link to that heading's page instead.
 
-### 7.8 When an image doesn't show
+### 8.8 When an image doesn't show
 
 | What you see | Why | Where |
 |---|---|---|
@@ -1485,7 +1632,7 @@ page.
 
 ---
 
-## 8. The browser version (WebAssembly)
+## 9. The browser version (WebAssembly)
 
 mdedit also runs in a web browser. It is **the same program**: `make wasm`
 compiles `cmd/mdedit` with `GOOS=js GOARCH=wasm`, and Gio has a browser
@@ -1509,7 +1656,7 @@ desktop functions were moved into `platform_desktop.go` unchanged, and
 the desktop screenshots and PDFs are pixel-identical to before the browser
 version existed.
 
-### 8.1 The platform seam in `internal/ui`
+### 9.1 The platform seam in `internal/ui`
 
 What each side provides:
 
@@ -1537,7 +1684,7 @@ a ⌘ in the status bar is found in some system font. A web page has no
 system fonts; without help, ⌘ is the missing-glyph box (§6.2). The browser
 side adds the maths font, which has ⌘, ⇧ and the arrows.
 
-### 8.2 Asynchronous results: picker, file reading, PDF export
+### 9.2 Asynchronous results: picker, file reading, PDF export
 
 On the desktop, opening a file is a function call. In the browser it is a
 chain of events that arrive later, from JavaScript:
@@ -1562,7 +1709,7 @@ pattern as `ui/app.go: RequestOpen` for files the macOS Finder asks to open.
 
 **Export PDF** works the same way: `exportDialog` starts
 `exportInBackground` on a goroutine (the export may wait for video stills
-to download, §7.7, and blocking the frame goroutine on the network would
+to download, §8.7, and blocking the frame goroutine on the network would
 freeze the page), which writes the PDF into a buffer, downloads it and
 reports through `deliver(status)`.
 
@@ -1570,7 +1717,7 @@ reports through `deliver(status)`.
 URL, and click a hidden `<a download="name">` pointing at it. The URL is
 released a minute later (`revokeURL`).
 
-### 8.3 Storage
+### 9.3 Storage
 
 - **The document** is written to `localStorage` on every change
   (`autosave`): `mdedit.text` (the editor's text), `mdedit.saved` (as last
@@ -1585,7 +1732,7 @@ released a minute later (`revokeURL`).
   `pdfout.registerImage` read them with `vfs.ModTime` and `vfs.Open`. On
   the desktop that is the disk; in the browser, a map that lasts as long
   as the page. Local images next to a document resolve to paths that
-  aren't in the map, so they show their alt text (§7.8).
+  aren't in the map, so they show their alt text (§8.8).
 - **Network:** `net/http` works in the browser (Go uses `fetch`). The
   browser only lets a page read images from another site if that site
   allows it; YouTube's still servers send `Access-Control-Allow-Origin: *`.
@@ -1596,7 +1743,7 @@ itself (`ImageOptions(path)`), which can't work on a map in memory.
 hands fpdf a reader (`RegisterImageOptionsReader`); `ImageOptions` then
 finds it by name.
 
-### 8.4 The web page and keys
+### 9.4 The web page and keys
 
 `web/index.html` loads Go's `wasm_exec.js`, fetches `mdedit.wasm` and
 starts it; Gio puts its canvas into `<div id="giowindow">`.
@@ -1617,7 +1764,7 @@ the `js` build), so the menus and status bar show the right one.
 offer on HTTPS pages and on `localhost`. Over plain HTTP from another
 machine, mdedit's copy and paste do nothing — serve it over HTTPS.
 
-### 8.5 Building, serving, installing
+### 9.5 Building, serving, installing
 
 `make wasm` (Makefile):
 
@@ -1655,7 +1802,7 @@ Behind a reverse proxy that does HTTPS (`assets/caddy/Caddyfile` for
 Caddy), the proxy passes the compressed responses through unchanged; it
 needn't compress anything itself, so the Caddy block has no `encode`.
 
-### 8.6 Adding something that touches the outside world
+### 9.6 Adding something that touches the outside world
 
 If a new feature reads or writes files, runs programs, or opens
 anything: put the platform-specific part in **both** `platform_desktop.go`
@@ -1665,9 +1812,9 @@ browser side is missing. Then try it with `make wasm && make serve`.
 
 ---
 
-## 9. The layers in detail
+## 10. The layers in detail
 
-### 9.1 `internal/ui` — the window
+### 10.1 `internal/ui` — the window
 
 | File | What's in it |
 |---|---|
@@ -1681,16 +1828,16 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `menubar.go`, `popup.go` | Menu bar titles; drop-down and context menu items |
 | `toolbar.go`, `statusbar.go` | Icon toolbar; status line |
 | `findbar.go`, `findbar_view.go` | Search/replace logic and view, match highlighting |
-| `ime.go` | Works around Gio's browser text input with selections (§11, Gotchas) |
+| `ime.go` | Works around Gio's browser text input with selections (§12, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
-| `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines) |
+| `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines; §7) |
 | `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |
 | `outline.go` | The outline sidebar: headings, following the caret, jumping to a heading |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
 | `widgets.go` | Shared building blocks: `button`, `framed`, `vspace`/`hspace`, `modal`, `keyPressed` |
-| `platform_desktop.go`, `platform_js.go` | Everything that differs between desktop and browser: Open/Save/Export, settings storage, links, Quit, autosave, fonts (§8) |
+| `platform_desktop.go`, `platform_js.go` | Everything that differs between desktop and browser: Open/Save/Export, settings storage, links, Quit, autosave, fonts (§9) |
 | `colors.go`, `theme.go` | The window's colours (`uiColors`: `lightColors`, `darkColors`, the current one in `col`); switching theme (`setDark`); `settings.json` |
 
 **Gio style used throughout:** no closures. A piece of UI is a named method
@@ -1737,7 +1884,7 @@ At start-up `startDark` uses the saved choice in
 `cmdToggleTheme` (View → Dark Theme, Ctrl+Shift+D) flips it and saves it.
 The PDF exporter always uses `render.Light`.
 
-### 9.2 `internal/edit` — editing commands as pure functions
+### 10.2 `internal/edit` — editing commands as pure functions
 
 | File | Commands |
 |---|---|
@@ -1768,7 +1915,7 @@ func SetHeading(s State, level int) State {
 }
 ```
 
-### 9.3 `internal/mdmodel` — Markdown to blocks
+### 10.3 `internal/mdmodel` — Markdown to blocks
 
 | File | What's in it |
 |---|---|
@@ -1805,7 +1952,7 @@ func (b *builder) block(n ast.Node) {
 `emit` stamps every block with its source line, its containers (`Decor`)
 and any active alignment.
 
-### 9.4 `internal/render` — blocks to primitives
+### 10.4 `internal/render` — blocks to primitives
 
 | File | What's in it |
 |---|---|
@@ -1832,7 +1979,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 }
 ```
 
-### 9.5 `internal/pdfout` — primitives to PDF
+### 10.5 `internal/pdfout` — primitives to PDF
 
 | File | What's in it |
 |---|---|
@@ -1841,7 +1988,7 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 | `draw.go` | `drawPrim` dispatcher and one function per `Prim` kind |
 | `fonts.go` | The embedded Go fonts, measuring, and **fallback glyphs** (⌘, ⇧, ✓ … drawn as outlines from the maths font) |
 
-### 9.6 `internal/tex` — maths
+### 10.6 `internal/tex` — maths
 
 | File | What's in it |
 |---|---|
@@ -1855,16 +2002,16 @@ func (c *Ctx) content(b *mdmodel.Block, w float32, col color.NRGBA) (*Layout, fl
 `tex.Layout(src, display)` returns a `Box` of `Item`s in em units;
 `render/render.go: mathPrims` turns them into `PGlyph`/`PRect`/`PPoly` prims.
 
-### 9.7 `internal/imgcache` and `internal/youtube`
+### 10.7 `internal/imgcache` and `internal/youtube`
 
 `imgcache.Fetch(src, done)` downloads in the background (the preview calls
 it from `ui/images.go: Preview.image` and redraws in `imageArrived`);
 `imgcache.Get(src)` downloads synchronously (the PDF calls it from
 `pdfout/pdf.go: imageSize`). Only YouTube stills are allowed
-(`youtube.IsThumbnail`). Failures aren't retried for a minute. §7 follows
+(`youtube.IsThumbnail`). Failures aren't retried for a minute. §8 follows
 images and videos through all layers.
 
-### 9.8 `internal/spell` — spell checking
+### 10.8 `internal/spell` — spell checking
 
 `en.txt.gz` is the word list (SCOWL size 60, American and British
 spellings; licence in `SCOWL-LICENSE.txt`), one word per line, prefixed
@@ -1923,7 +2070,7 @@ goroutine (`loadDictionary`: from `internal/vfs`, else downloaded and
 stored there) and arrive through a channel that `handleArrivals` empties
 each frame.
 
-### 9.9 The outline sidebar (`ui/outline.go`)
+### 10.9 The outline sidebar (`ui/outline.go`)
 
 `App.reparse` gives `outline.update` the headings of the parsed document
 and the rune offset of each one's line. `mainArea` (called from `body`)
@@ -1937,7 +2084,7 @@ uses `ScrollToBlock`.
 
 ---
 
-## 10. Recipes: where to add things
+## 11. Recipes: where to add things
 
 ### Add an editing command (menu item, shortcut, maybe a toolbar icon)
 
@@ -1979,7 +2126,7 @@ Touch these, in order — the compiler won't remind you about the switches:
    may split it across pages.
 4. If you need a new kind of shape, see the next recipe.
 5. Test: `mdmodel/*_test.go` for parsing, a render or PDF test, and a
-   screenshot scene (§11).
+   screenshot scene (§12).
 
 ### Add an inline style or inline element
 
@@ -2019,7 +2166,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 11. Finding bugs
+## 12. Finding bugs
 
 ### Symptom → where to look
 
@@ -2079,7 +2226,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   screen, not lines of the text. Use `App.caretLine()` (from the line
   starts recorded at each reparse) for anything that is matched with the
   document, such as `Block.Line`; mixing them up made the preview jump to
-  the wrong block.
+  the wrong block (§7.8).
 - **Tabs:** Gio can't display tab characters, so the editor converts them
   to spaces (`edit.ExpandTabs`) on load and paste.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
@@ -2118,7 +2265,7 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 ---
 
-## 12. Code style
+## 13. Code style
 
 Enforced by `internal/lint/style_test.go`, which runs with `make test`:
 
