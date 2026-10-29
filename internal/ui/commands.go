@@ -152,12 +152,17 @@ func (a *App) fileMenu() *menu {
 	items := []*command{
 		newCommand("New", "N", 0, a.cmdNew),
 		newCommand("Open…", "O", 0, a.cmdOpen),
+	}
+	if recent := a.recentCommands(); len(recent) > 0 {
+		items = append(append(items, nil), recent...)
+	}
+	items = append(items,
 		nil,
 		newCommand("Save", "S", 0, a.cmdSave),
 		newCommand("Save As…", "S", key.ModShift, a.cmdSaveAs),
 		nil,
 		newCommand("Export PDF…", "E", 0, a.cmdExport),
-	}
+	)
 	return &menu{"File", append(items, a.quitCommands()...)}
 }
 

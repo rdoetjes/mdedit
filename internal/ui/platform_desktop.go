@@ -33,6 +33,9 @@ func (a *App) handleArrivals() {}
 // saveRecovery for unsaved work.
 func (a *App) autosave() {}
 
+// recentFilesSupported: the desktop can reopen files by their path.
+const recentFilesSupported = true
+
 // quitCommands are the File menu's last items.
 func (a *App) quitCommands() []*command {
 	return []*command{nil, newCommand("Quit", "Q", 0, a.cmdQuit)}

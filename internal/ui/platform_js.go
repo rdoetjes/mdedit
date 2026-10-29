@@ -96,6 +96,10 @@ func (a *App) autosave() {
 	}
 }
 
+// recentFilesSupported: a web page can't reopen a file from the disk
+// without the user picking it again, so there are no recent files.
+const recentFilesSupported = false
+
 // quitCommands: a web page is closed with its tab, so there is no Quit.
 func (a *App) quitCommands() []*command { return nil }
 

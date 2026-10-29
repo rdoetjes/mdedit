@@ -152,6 +152,7 @@ func (a *App) writeFile(p string, then action) {
 		return
 	}
 	a.path = p
+	a.rememberRecent(p)
 	a.saved = txt
 	a.dirty = false
 	a.preview.BaseDir = filepath.Dir(p)

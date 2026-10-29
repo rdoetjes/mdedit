@@ -120,6 +120,10 @@ func (s *shooter) previewScenes() {
 
 func (s *shooter) overlayScenes() {
 	a := s.h.a
+	a.bar.open = 0 // File, with TEST.md and HOW_IT_WORKS.md as recent files
+	a.rememberRecent("../../HOW_IT_WORKS.md")
+	a.rememberRecent("../mdmodel/testdata/TEST.md")
+	s.shot("menu-file.png")
 	a.bar.open = 2 // Format
 	s.shot("menu-format.png")
 	a.bar.open = -1

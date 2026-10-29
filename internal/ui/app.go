@@ -73,7 +73,8 @@ type App struct {
 	find        findBar
 	spell       spellChecker
 	outline     outline
-	version     int // counts text changes, to know when to search again
+	recent      []string // recently used files, newest first
+	version     int      // counts text changes, to know when to search again
 
 	dialog dialog
 	flow   flow
@@ -111,6 +112,8 @@ func New(path string) (*App, error) {
 	a.setDark(startDark(st))
 	a.spell.init(a, st)
 	a.outline.init(a, st)
+	a.recent = st.Recent
+	a.rebuildFileMenu()
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}
@@ -124,6 +127,7 @@ func (a *App) load(path, content string) {
 		a.setStatus("Tabs converted to spaces (the file changes only when you save)")
 	}
 	a.path = path
+	a.rememberRecent(path)
 	a.saved = content
 	a.editor.SetText(content)
 	a.editor.SetCaret(0, 0)

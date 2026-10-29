@@ -1684,6 +1684,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `ime.go` | Works around Gio's browser text input with selections (§11, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
+| `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |
 | `outline.go` | The outline sidebar: headings, following the caret, jumping to a heading |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |

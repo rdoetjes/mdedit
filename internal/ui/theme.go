@@ -17,6 +17,7 @@ type settings struct {
 	Words      []string `json:"words,omitempty"`     // added to the dictionary
 	Languages  []string `json:"languages,omitempty"` // spelling languages; English if none
 	Outline    bool     `json:"outline,omitempty"`   // show the outline sidebar
+	Recent     []string `json:"recent,omitempty"`    // recently used files, newest first
 }
 
 func loadSettings() settings {

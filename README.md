@@ -113,6 +113,12 @@ Dutch or German text full of English terms. Compound words (Dutch
 "l'homme") are understood. In the browser the dictionaries are downloaded
 again on each visit.
 
+The File menu lists the last five files you opened or saved, newest
+first; choosing one opens it (asking first about unsaved changes). The
+list is kept in `settings.json`; a file that has since been deleted is
+dropped from it. The browser version has no recent files, since a web page
+can't reopen a file without you picking it again.
+
 View → Show Outline (Ctrl+Shift+O) opens a sidebar listing the document's
 headings, indented by level. Click one to show it at the top of the editor
 and the preview; the heading of the section you are typing in is
