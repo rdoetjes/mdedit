@@ -29,6 +29,7 @@ func (a *App) layout(gtx layout.Context) {
 	a.handleInput(gtx)
 	a.spell.handleArrivals()
 	a.handleEditorEvents(gtx)
+	a.reparseIfDue(gtx)
 	a.spell.handleClick(gtx)
 	a.handleRightClick(gtx)
 	a.updateTitle()
@@ -99,8 +100,9 @@ func (a *App) handleEditorEvents(gtx layout.Context) {
 func (a *App) editorChanged(gtx layout.Context) {
 	if strings.ContainsRune(a.editor.Text(), '\t') {
 		a.applyEdit(gtx, edit.ExpandTabs) // pasted text
+		return
 	}
-	a.reparse()
+	a.typedText(gtx)
 }
 
 // handleRightClick opens the context menu on a right-click in the editor or
