@@ -2075,11 +2075,6 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   bytes. Mixing them up breaks on any non-ASCII text.
 - **Tabs:** Gio can't display tab characters, so the editor converts them
   to spaces (`edit.ExpandTabs`) on load and paste.
-- **Typing postpones parsing:** when a reparse takes over 4 ms (large
-  documents, or the browser), typing doesn't parse, spell-check and
-  autosave on every key but 150 ms after the last one (`ui/typing.go`);
-  until then `a.doc` is a little behind the editor, and the misspellings
-  and outline offsets are shifted along with each edit.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
   its shaper cached only 1000 lines and laid out text in quadratic time,
   which made typing in documents over ~1000 different lines crawl. Gio's

@@ -74,11 +74,6 @@ type App struct {
 	spell       spellChecker
 	outline     outline
 	version     int // counts text changes, to know when to search again
-	// parsedText is the text the misspellings and outline refer to; a
-	// reparse postponed while typing is due at reparseDue (typing.go).
-	parsedText  string
-	reparseDue  time.Time
-	reparseCost time.Duration
 
 	dialog dialog
 	flow   flow
@@ -139,11 +134,7 @@ func (a *App) load(path, content string) {
 }
 
 func (a *App) reparse() {
-	start := time.Now()
-	defer a.measureReparse(start)
 	txt := a.editor.Text()
-	a.parsedText = txt
-	a.reparseDue = time.Time{}
 	a.version++
 	a.doc = mdmodel.Parse([]byte(txt))
 	a.preview.SetDocument(a.doc)
@@ -153,12 +144,6 @@ func (a *App) reparse() {
 	a.dirty = txt != a.saved
 	a.words = countWords(txt)
 	a.autosave()
-}
-
-// measureReparse remembers how long a reparse took, to decide whether
-// typing should wait for a pause before the next one (typing.go).
-func (a *App) measureReparse(start time.Time) {
-	a.reparseCost = time.Since(start)
 }
 
 func countWords(s string) int {

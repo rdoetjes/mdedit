@@ -29,7 +29,6 @@ func (a *App) layout(gtx layout.Context) {
 	a.handleInput(gtx)
 	a.spell.handleArrivals()
 	a.handleEditorEvents(gtx)
-	a.reparseIfDue(gtx)
 	a.spell.handleClick(gtx)
 	a.handleRightClick(gtx)
 	a.updateTitle()
@@ -102,7 +101,7 @@ func (a *App) editorChanged(gtx layout.Context) {
 		a.applyEdit(gtx, edit.ExpandTabs) // pasted text
 		return
 	}
-	a.typedText(gtx)
+	a.reparse()
 }
 
 // handleRightClick opens the context menu on a right-click in the editor or
