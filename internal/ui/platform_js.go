@@ -266,3 +266,6 @@ func recoverJS(err *error) {
 		*err = fmt.Errorf("%v", r)
 	}
 }
+
+// reorderIMESelection works around Gio's browser text input (see ime.go).
+var reorderIMESelection = true

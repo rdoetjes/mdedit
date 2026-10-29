@@ -1680,6 +1680,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `menubar.go`, `popup.go` | Menu bar titles; drop-down and context menu items |
 | `toolbar.go`, `statusbar.go` | Icon toolbar; status line |
 | `findbar.go`, `findbar_view.go` | Search/replace logic and view, match highlighting |
+| `ime.go` | Works around Gio's browser text input with selections (§11, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `filedialog.go`, `confirm.go`, `tabledialog.go`, `videodialog.go` | Modal dialogs (all implement `dialog`) |
 | `preview.go`, `paint.go`, `textpaint.go`, `images.go` | The preview: list, layout cache, painters per `Prim` kind, text shaping, image cache |
@@ -2053,6 +2054,12 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   `make test` vets the browser build too (`GOOS=js GOARCH=wasm go vet`),
   which catches a missing twin; the UI tests themselves only run on the
   desktop.
+- **Typing in the browser** goes through a hidden text field and Gio's
+  `app/os_js.go`, not through key events as on the desktop. Its handler
+  assumes the editor's selection has Start <= End, which isn't true after
+  selecting left to right; `ui/ime.go: orderIMESelection` reports the
+  selection in order (browser only) so typing over a selection lands in
+  the right place. `ui/ime_test.go` replays that handler on the desktop.
 - **macOS builds** need `CC=clang` (the Makefile sets it); a Homebrew GCC
   can't compile Gio's Objective-C.
 

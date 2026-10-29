@@ -157,3 +157,7 @@ func writeSettings(data []byte) error {
 	}
 	return os.WriteFile(filepath.Join(configDir, "settings.json"), data, 0o644)
 }
+
+// reorderIMESelection is only needed in the browser (see ime.go); tests
+// switch it on.
+var reorderIMESelection = false

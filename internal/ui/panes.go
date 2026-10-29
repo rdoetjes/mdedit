@@ -102,14 +102,20 @@ func (a *App) editorArea(gtx layout.Context) layout.Dimensions {
 	return layout.Inset{Top: 12, Bottom: 12, Left: 14, Right: 10}.Layout(gtx, a.editorView)
 }
 
+// editorTextSize is the size of the editor's text, in sp.
+const editorTextSize = 14
+
 func (a *App) editorView(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Min = gtx.Constraints.Max
 	e := material.Editor(a.th, &a.editor, "Start writing Markdown…")
 	e.Font = font.Font{Typeface: "Go Mono"}
-	e.TextSize = 14
+	e.TextSize = editorTextSize
 	e.LineHeightScale = 1.35
 	e.SelectionColor = col.selectColor
 	dims := e.Layout(gtx)
+	if reorderIMESelection {
+		a.orderIMESelection(gtx)
+	}
 	a.spell.underline(gtx, dims.Size)
 	a.find.highlight(gtx)
 	return dims
