@@ -211,9 +211,7 @@ func (l learnWord) run(layout.Context) {
 	}
 	st := loadSettings()
 	st.Words = append(st.Words, l.word)
-	if err := st.save(); err != nil {
-		l.s.a.setStatus("Could not save the dictionary: %v", err)
-	}
+	l.s.a.saveSettings(st, "the dictionary")
 }
 
 // cmdToggleSpelling shows or hides the spelling errors and remembers the
@@ -223,7 +221,5 @@ func (a *App) cmdToggleSpelling(layout.Context) {
 	a.spell.recheck()
 	st := loadSettings()
 	st.NoSpelling = !a.spell.on
-	if err := st.save(); err != nil {
-		a.setStatus("Could not save the spelling setting: %v", err)
-	}
+	a.saveSettings(st, "the spelling setting")
 }

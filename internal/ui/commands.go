@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 
 	"gioui.org/io/clipboard"
@@ -73,6 +74,17 @@ func (c *command) tooltip() string {
 type menu struct {
 	title string
 	items []*command // nil entries are separators
+	// build, if set, makes the items each time the menu is shown, for
+	// menus that change (the File menu's recent files).
+	build func() []*command
+}
+
+// list returns the menu's items.
+func (m *menu) list() []*command {
+	if m.build != nil {
+		return m.build()
+	}
+	return m.items
 }
 
 // commands are the commands referred to from more than one place.
@@ -86,6 +98,8 @@ type commands struct {
 	video                    *command
 	theme                    *command
 	spelling, outline        *command
+	// The File menu's fixed items, above and below the recent files.
+	fileTop, fileBottom []*command
 }
 
 func mustIcon(data []byte) *widget.Icon {
@@ -148,26 +162,34 @@ func (a *App) buildToolbar() {
 		nil, c.numbered, c.bullets, c.table, c.video, nil, c.find, c.replace}
 }
 
+// fileMenu is built each time it opens, to show the current recent files
+// between Open and Save.
 func (a *App) fileMenu() *menu {
-	items := []*command{
+	c := &a.cmds
+	c.fileTop = []*command{
 		newCommand("New", "N", 0, a.cmdNew),
 		newCommand("Open…", "O", 0, a.cmdOpen),
 	}
-	if recent := a.recentCommands(); len(recent) > 0 {
-		items = append(append(items, nil), recent...)
-	}
-	items = append(items,
+	c.fileBottom = append([]*command{
 		nil,
 		newCommand("Save", "S", 0, a.cmdSave),
 		newCommand("Save As…", "S", key.ModShift, a.cmdSaveAs),
 		nil,
 		newCommand("Export PDF…", "E", 0, a.cmdExport),
-	)
-	return &menu{"File", append(items, a.quitCommands()...)}
+	}, a.quitCommands()...)
+	return &menu{title: "File", build: a.fileItems}
+}
+
+func (a *App) fileItems() []*command {
+	items := slices.Clone(a.cmds.fileTop)
+	if recent := a.recentCommands(); len(recent) > 0 {
+		items = append(append(items, nil), recent...)
+	}
+	return append(items, a.cmds.fileBottom...)
 }
 
 func (a *App) editMenu() *menu {
-	return &menu{"Edit", []*command{
+	return &menu{title: "Edit", items: []*command{
 		a.cmds.cut, a.cmds.copy, a.cmds.paste,
 		nil,
 		{label: "Select All", key: "A", native: true, run: a.selectAll},
@@ -183,7 +205,7 @@ func (a *App) editMenu() *menu {
 
 func (a *App) formatMenu() *menu {
 	c := &a.cmds
-	return &menu{"Format", []*command{
+	return &menu{title: "Format", items: []*command{
 		c.bold, c.italic, c.underline,
 		a.editCommand("Strikethrough", "X", key.ModShift, inlineMarker(edit.Strike).apply),
 		a.editCommand("Inline Code", "", 0, inlineMarker(edit.Code).apply),
@@ -203,7 +225,7 @@ func (a *App) formatMenu() *menu {
 
 func (a *App) insertMenu() *menu {
 	c := &a.cmds
-	return &menu{"Insert", []*command{
+	return &menu{title: "Insert", items: []*command{
 		c.numbered, c.bullets,
 		a.editCommand("Task List", "", 0, listStyle(edit.Tasks).apply),
 		a.editCommand("Quote", "Q", key.ModShift, edit.ToggleQuote),
@@ -222,7 +244,7 @@ func (a *App) insertMenu() *menu {
 }
 
 func (a *App) viewMenu() *menu {
-	return &menu{"View", []*command{
+	return &menu{title: "View", items: []*command{
 		newCommand("Editor and Preview", "", 0, viewChoice{a, viewSplit}.run),
 		newCommand("Editor Only", "", 0, viewChoice{a, viewEditor}.run),
 		newCommand("Preview Only", "", 0, viewChoice{a, viewPreview}.run),
@@ -235,7 +257,7 @@ func (a *App) viewMenu() *menu {
 }
 
 func (a *App) helpMenu() *menu {
-	return &menu{"Help", []*command{
+	return &menu{title: "Help", items: []*command{
 		newCommand("Markdown Reference", "", 0, a.cmdMarkdownHelp),
 		newCommand("About mdedit", "", 0, a.cmdAbout),
 	}}

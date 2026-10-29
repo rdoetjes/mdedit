@@ -37,7 +37,7 @@ func writeDocs(t *testing.T, n int) []string {
 // recentItems returns the recent file entries of the File menu.
 func (h *harness) recentItems() []*command {
 	var out []*command
-	for _, c := range h.a.menus[0].items {
+	for _, c := range h.a.menus[0].list() {
 		if c != nil && strings.Contains(c.label, "  —  ") {
 			out = append(out, c)
 		}

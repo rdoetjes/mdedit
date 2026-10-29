@@ -44,23 +44,16 @@ type sameFile string
 
 func (f sameFile) is(p string) bool { return p == string(f) }
 
-// setRecent changes the list, saves it and updates the File menu.
+// setRecent changes the list and saves it; the File menu shows it the
+// next time it opens.
 func (a *App) setRecent(list []string) {
 	if slices.Equal(list, a.recent) {
 		return
 	}
 	a.recent = list
-	a.rebuildFileMenu()
 	st := loadSettings()
 	st.Recent = list
-	if err := st.save(); err != nil {
-		a.setStatus("Could not save the recent files: %v", err)
-	}
-}
-
-func (a *App) rebuildFileMenu() {
-	a.menus[0] = a.fileMenu()
-	a.shortcuts = shortcutCommands(a.menus)
+	a.saveSettings(st, "the recent files")
 }
 
 // recentCommands are the File menu entries for the recent files.

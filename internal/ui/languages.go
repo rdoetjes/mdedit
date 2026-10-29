@@ -151,7 +151,5 @@ func (a *App) languagesChosen(codes []string) {
 	a.spell.recheck()
 	st := loadSettings()
 	st.Languages = codes
-	if err := st.save(); err != nil {
-		a.setStatus("Could not save the spelling languages: %v", err)
-	}
+	a.saveSettings(st, "the spelling languages")
 }

@@ -13,7 +13,7 @@ func shortcutCommands(menus []*menu) []*command {
 	var out []*command
 	seen := map[*command]bool{}
 	for _, m := range menus {
-		for _, c := range m.items {
+		for _, c := range m.list() {
 			if c != nil && c.key != "" && !c.native && !seen[c] {
 				seen[c] = true
 				out = append(out, c)

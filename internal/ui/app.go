@@ -113,7 +113,6 @@ func New(path string) (*App, error) {
 	a.spell.init(a, st)
 	a.outline.init(a, st)
 	a.recent = st.Recent
-	a.rebuildFileMenu()
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

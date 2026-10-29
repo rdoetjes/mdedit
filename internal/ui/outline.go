@@ -222,9 +222,7 @@ func (a *App) cmdToggleOutline(layout.Context) {
 	a.outline.setOpen(!a.outline.open)
 	st := loadSettings()
 	st.Outline = a.outline.open
-	if err := st.save(); err != nil {
-		a.setStatus("Could not save the outline setting: %v", err)
-	}
+	a.saveSettings(st, "the outline setting")
 }
 
 // mainArea lays out the outline, if shown, left of the panes.

@@ -28,6 +28,14 @@ func loadSettings() settings {
 	return s
 }
 
+// saveSettings writes changed settings, reporting a failure in the status
+// bar; what names the setting in that message.
+func (a *App) saveSettings(st settings, what string) {
+	if err := st.save(); err != nil {
+		a.setStatus("Could not save %s: %v", what, err)
+	}
+}
+
 func (s settings) save() error {
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
@@ -82,9 +90,7 @@ var (
 // cmdToggleTheme switches theme and remembers the choice.
 func (a *App) cmdToggleTheme(layout.Context) {
 	a.setDark(!a.dark)
-	s := loadSettings()
-	s.Theme = themeName(a.dark)
-	if err := s.save(); err != nil {
-		a.setStatus("Could not save the theme setting: %v", err)
-	}
+	st := loadSettings()
+	st.Theme = themeName(a.dark)
+	a.saveSettings(st, "the theme setting")
 }

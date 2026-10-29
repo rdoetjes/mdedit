@@ -90,7 +90,7 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 	// Leave the bar uncovered so its titles stay clickable.
 	bar := image.Rect(0, 0, gtx.Constraints.Max.X, m.barH)
 	at := image.Pt(m.titleX[m.open], m.barH)
-	chosen, closed := m.popup.Layout(gtx, th, menus[m.open].items, at, bar)
+	chosen, closed := m.popup.Layout(gtx, th, menus[m.open].list(), at, bar)
 	if closed {
 		m.open = -1
 	}
