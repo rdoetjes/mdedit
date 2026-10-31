@@ -74,6 +74,16 @@ func (p *Preview) SetTheme(t *render.Theme) {
 	}
 }
 
+// setFont changes the shaper and typeface of the text, and lays everything
+// out again.
+func (p *Preview) setFont(s *text.Shaper, typeface string) {
+	p.text.shaper, p.text.body = s, typeface
+	p.text.cache = map[measureKey]render.Metrics{}
+	if p.doc != nil {
+		p.cache = make([]*render.Layout, len(p.doc.Blocks))
+	}
+}
+
 // ScrollToBlock scrolls so block i is at the top.
 func (p *Preview) ScrollToBlock(i int) {
 	p.list.Position.First = i + 1 // index 0 is the top padding

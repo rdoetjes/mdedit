@@ -91,7 +91,11 @@ func exportPDF(in, out string) error {
 		return err
 	}
 	base := strings.TrimSuffix(filepath.Base(in), filepath.Ext(in))
-	err = pdfout.Write(f, mdmodel.Parse(src), pdfout.Options{BaseDir: filepath.Dir(in), Title: base})
+	font, ferr := ui.SavedFont()
+	if ferr != nil {
+		fmt.Fprintln(os.Stderr, "mdedit: using the built-in font:", ferr)
+	}
+	err = pdfout.Write(f, mdmodel.Parse(src), pdfout.Options{BaseDir: filepath.Dir(in), Title: base, Font: font})
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}

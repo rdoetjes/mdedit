@@ -9,6 +9,7 @@ import (
 	"mdedit/internal/imgcache"
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
+	"mdedit/internal/sysfont"
 )
 
 // Options control the page setup.
@@ -18,6 +19,7 @@ type Options struct {
 	Margin   float32 // page margin in points
 	BaseDir  string  // directory relative image paths are resolved against
 	Title    string
+	Font     sysfont.Set // font for text and headings; empty for the Go font
 }
 
 func (o *Options) defaults() {
@@ -32,13 +34,17 @@ func (o *Options) defaults() {
 	}
 }
 
-// Font metrics of the Go fonts (hhea ascender/descender over units per em).
+// Line metrics of the Go fonts, over the em. A chosen font uses its own.
 const ascent, descent = 0.905, 0.212
 
 // Write renders doc as PDF to w.
 func Write(w io.Writer, doc *mdmodel.Document, opt Options) error {
 	opt.defaults()
-	e := newExporter(opt)
+	fonts, err := newFonts(opt.Font)
+	if err != nil {
+		return err
+	}
+	e := newExporter(opt, fonts)
 	e.registerLinks(doc)
 	e.pdf.AddPage()
 	e.y = e.top
@@ -60,16 +66,17 @@ type exporter struct {
 	links             map[string]int
 	coverage          map[coverKey]bool
 	base              string
+	fonts             []pdfFont
 }
 
-func newExporter(opt Options) *exporter {
+func newExporter(opt Options, fonts []pdfFont) *exporter {
 	pdf := fpdf.New("P", "pt", opt.PageSize, "")
 	m := float64(opt.Margin)
 	pdf.SetMargins(m, m, m)
 	pdf.SetAutoPageBreak(false, 0)
 	pdf.SetTitle(opt.Title, true)
 	pdf.SetCreator("mdedit", true)
-	registerFonts(pdf)
+	registerFonts(pdf, fonts)
 	pw, ph := pdf.GetPageSize()
 	e := &exporter{
 		pdf:      pdf,
@@ -80,6 +87,7 @@ func newExporter(opt Options) *exporter {
 		links:    map[string]int{},
 		coverage: map[coverKey]bool{},
 		base:     opt.BaseDir,
+		fonts:    fonts,
 	}
 	e.ctx = &render.Ctx{Em: opt.FontSize, Theme: &render.Light, Measure: e.measure,
 		MaxImageHeight: float32(ph - 2*m), ImageSize: e.imageSize}

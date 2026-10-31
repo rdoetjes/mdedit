@@ -144,6 +144,7 @@ That is why the preview and the PDF can't drift apart.
 | `internal/tex` | TeX maths typesetter; embeds the STIX Two Math font; glyph outlines | x/image/font/sfnt |
 | `internal/pdfout` | Paints `Layout`s onto PDF pages, splitting blocks at page breaks | render, tex, imgcache, vfs, fpdf |
 | `internal/imgcache` | Downloads YouTube stills into a cache (async for the preview, sync for PDF) | youtube, vfs |
+| `internal/sysfont` | Finds installed fonts both the preview and the PDF can use, and turns a face (also from a `.ttc` collection) into a standalone TrueType file | go-text |
 | `internal/vfs` | File storage for images: the disk on the desktop, memory in the browser (§9) | — |
 | `internal/youtube` | YouTube URLs and video-ID parsing | — |
 | `internal/spell` | Spell checking: the embedded English word list, a Hunspell dictionary reader, downloading dictionaries, finding misspelt words in Markdown, suggestions | mdmodel |
@@ -1831,6 +1832,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `ime.go` | Works around Gio's browser text input with selections (§12, Gotchas) |
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
+| `fonts.go`, `fontdialog.go` | The document font: restoring it, applying it to the preview and PDF, the background font scan, the Document Font dialog |
 | `caret.go` | The editor's block caret: a yellow box over the character at the caret, drawn in red; it doesn't blink and shows while the editor has the focus; Gio's thin caret is switched off (`Editor.HideCaret`, a patch in `third_party`) |
 | `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines; §7) |
 | `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |
@@ -2230,6 +2232,15 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   the wrong block (§7.8).
 - **Tabs:** Gio can't display tab characters, so the editor converts them
   to spaces (`edit.ExpandTabs`) on load and paste.
+- **Document fonts and fpdf:** fpdf refuses collections and PostScript
+  outlines, and without a Unicode format 4 `cmap` it doesn't fail: it prints
+  a message and writes text that shows wrongly. So `sysfont.usable` checks
+  all of that itself, and `sysfont.standalone` cuts faces out of collections.
+  "No error" says little here: check real PDFs by eye
+  (`MDEDIT_FONTS=folder go test ./internal/sysfont -run RealFonts` writes one
+  per family). The Go fonts keep the fixed line metrics in `pdfout/pdf.go`
+  (their real ascent differs; using it would shift every existing PDF); a
+  chosen font uses its own.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
   its shaper cached only 1000 lines and laid out text in quadratic time,
   which made typing in documents over ~1000 different lines crawl; and its

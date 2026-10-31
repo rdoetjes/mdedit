@@ -113,6 +113,15 @@ Dutch or German text full of English terms. Compound words (Dutch
 "l'homme") are understood. In the browser the dictionaries are downloaded
 again on each visit.
 
+View → Document Font… chooses the font of the text and headings in the
+preview and the PDF from the fonts installed on your computer; the filter
+above the list narrows it down. Code stays monospaced, and `mdedit -pdf` uses
+the same font. The list holds the fonts a PDF can embed: TrueType outlines
+(`.ttf`, and `.ttc` collections, but most `.otf` files use PostScript outlines
+and aren't listed) with Western accents, and a licence that allows embedding.
+A family without bold or italic uses its regular face for those. The browser
+version can't read installed fonts, so it keeps the built-in font.
+
 The caret in the editor is a steady yellow block, with the character
 under it in red, so you see at a glance where you are.
 

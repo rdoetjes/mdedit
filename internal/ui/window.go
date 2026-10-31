@@ -28,6 +28,7 @@ type contextMenu struct {
 func (a *App) layout(gtx layout.Context) {
 	a.handleInput(gtx)
 	a.spell.handleArrivals()
+	a.handleFontScan()
 	a.handleEditorEvents(gtx)
 	a.spell.handleClick(gtx)
 	a.handleRightClick(gtx)

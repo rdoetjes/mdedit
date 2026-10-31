@@ -21,6 +21,7 @@ import (
 
 	"mdedit/internal/edit"
 	"mdedit/internal/mdmodel"
+	"mdedit/internal/sysfont"
 )
 
 type viewMode int
@@ -74,6 +75,12 @@ type App struct {
 	spell       spellChecker
 	outline     outline
 	recent      []string // recently used files, newest first
+	// bodyFont is the document font, empty for the built-in one (fonts.go);
+	// families are the installed fonts, once scanned, which arrive through
+	// fontArrival.
+	bodyFont    sysfont.Set
+	families    []sysfont.Family
+	fontArrival chan []sysfont.Family
 	// runes is the text as of the last reparse, and lines the rune offset
 	// where each of its lines starts.
 	runes []rune
@@ -127,6 +134,7 @@ func New(path string) (*App, error) {
 	a.spell.init(a, st)
 	a.outline.init(a, st)
 	a.recent = st.Recent
+	a.restoreFont(st)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

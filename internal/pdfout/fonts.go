@@ -1,11 +1,14 @@
 package pdfout
 
 import (
+	"bytes"
+	"fmt"
 	"image/color"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-pdf/fpdf"
+	"github.com/go-text/typesetting/font"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/gobolditalic"
 	"golang.org/x/image/font/gofont/goitalic"
@@ -14,9 +17,9 @@ import (
 	"golang.org/x/image/font/gofont/gomonobolditalic"
 	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
-	"golang.org/x/image/font/sfnt"
 
 	"mdedit/internal/render"
+	"mdedit/internal/sysfont"
 	"mdedit/internal/tex"
 )
 
@@ -38,23 +41,56 @@ var goFaces = []goFace{
 	{"gomono", "BI", gomonobolditalic.TTF},
 }
 
-// goFonts are the parsed Go fonts, used to find characters they lack.
-var goFonts = parseGoFonts()
-
-func parseGoFonts() []*sfnt.Font {
-	out := make([]*sfnt.Font, len(goFaces))
-	for i, f := range goFaces {
-		font, err := sfnt.Parse(f.ttf)
-		if err != nil {
-			panic(err)
-		}
-		out[i] = font
-	}
-	return out
+// pdfFont is a face in the PDF, in the order of fontIndex.
+type pdfFont struct {
+	goFace
+	font            *font.Font
+	ascent, descent float32 // over the em
 }
 
-func registerFonts(pdf *fpdf.Fpdf) {
-	for _, f := range goFaces {
+// newFonts returns the fonts of a PDF: the Go fonts, with the text faces
+// replaced by the chosen font, if any. Go Mono stays for code. A style the
+// chosen font lacks uses its regular face, as the preview does.
+func newFonts(body sysfont.Set) ([]pdfFont, error) {
+	out := make([]pdfFont, len(goFaces))
+	for i, f := range goFaces {
+		if i < 4 && body.TTF[sysfont.Regular] != nil {
+			f = bodyFace(body, i)
+		}
+		parsed, err := parseFont(f)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = parsed
+	}
+	return out, nil
+}
+
+// bodyFace is the chosen font's face for style i of fontIndex, whose order
+// (regular, bold, italic, bold italic) is that of sysfont.
+func bodyFace(body sysfont.Set, i int) goFace {
+	ttf := body.TTF[i]
+	if ttf == nil {
+		ttf = body.TTF[sysfont.Regular]
+	}
+	return goFace{"body", goFaces[i].style, ttf}
+}
+
+func parseFont(f goFace) (pdfFont, error) {
+	parsed, err := font.ParseTTF(bytes.NewReader(f.ttf))
+	if err != nil {
+		return pdfFont{}, fmt.Errorf("font %s: %w", f.family, err)
+	}
+	out := pdfFont{goFace: f, font: parsed.Font, ascent: ascent, descent: descent}
+	if ext, ok := parsed.FontHExtents(); ok && ext.Ascender > 0 && f.family == "body" {
+		em := float32(parsed.Upem())
+		out.ascent, out.descent = ext.Ascender/em, -ext.Descender/em
+	}
+	return out, nil
+}
+
+func registerFonts(pdf *fpdf.Fpdf, fonts []pdfFont) {
+	for _, f := range fonts {
 		pdf.AddUTF8FontFromBytes(f.family, f.style, f.ttf)
 	}
 }
@@ -74,7 +110,7 @@ func fontIndex(f render.FontSpec) int {
 }
 
 func (e *exporter) setFont(f render.FontSpec, size float32) {
-	face := goFaces[fontIndex(f)]
+	face := e.fonts[fontIndex(f)]
 	e.pdf.SetFont(face.family, face.style, float64(size))
 }
 
@@ -84,7 +120,8 @@ func (e *exporter) measure(f render.FontSpec, size float32, s string) render.Met
 	for _, pc := range e.pieces(f, s) {
 		w += e.pieceWidth(pc, size)
 	}
-	return render.Metrics{Width: w, Ascent: ascent * size, Descent: descent * size}
+	face := e.fonts[fontIndex(f)]
+	return render.Metrics{Width: w, Ascent: face.ascent * size, Descent: face.descent * size}
 }
 
 func (e *exporter) pieceWidth(pc piece, size float32) float32 {
@@ -99,7 +136,7 @@ func (e *exporter) pieceWidth(pc piece, size float32) float32 {
 	return w
 }
 
-// Characters the Go fonts lack (⌘, ⇧, ✓ …) are drawn as outlines from the
+// Characters the font lacks (⌘, ⇧, ✓ …) are drawn as outlines from the
 // maths font instead of as empty boxes.
 
 type piece struct {
@@ -112,7 +149,7 @@ type coverKey struct {
 	r rune
 }
 
-// pieces splits s into runs the Go font can set and runs that need the
+// pieces splits s into runs the font can set and runs that need the
 // fallback font.
 func (e *exporter) pieces(f render.FontSpec, s string) []piece {
 	var out []piece
@@ -127,7 +164,7 @@ func (e *exporter) pieces(f render.FontSpec, s string) []piece {
 	return out
 }
 
-// needsFallback reports whether r is missing from the Go font but available
+// needsFallback reports whether r is missing from the font but available
 // in the fallback font. Otherwise the PDF font shows its missing-glyph box.
 func (e *exporter) needsFallback(f render.FontSpec, r rune) bool {
 	if e.covered(f, r) {
@@ -145,9 +182,8 @@ func (e *exporter) covered(f render.FontSpec, r rune) bool {
 	if v, ok := e.coverage[k]; ok {
 		return v
 	}
-	var buf sfnt.Buffer
-	g, err := goFonts[fontIndex(f)].GlyphIndex(&buf, r)
-	e.coverage[k] = err == nil && g != 0
+	g, ok := e.fonts[fontIndex(f)].font.Cmap.Lookup(r)
+	e.coverage[k] = ok && g != 0
 	return e.coverage[k]
 }
 

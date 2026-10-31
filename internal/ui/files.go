@@ -173,7 +173,7 @@ func (a *App) writePDF(p string) error {
 	if err != nil {
 		return err
 	}
-	err = pdfout.Write(f, a.doc, pdfout.Options{BaseDir: a.preview.BaseDir, Title: a.baseName()})
+	err = pdfout.Write(f, a.doc, pdfout.Options{BaseDir: a.preview.BaseDir, Title: a.baseName(), Font: a.bodyFont})
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}

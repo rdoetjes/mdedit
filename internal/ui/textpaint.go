@@ -19,6 +19,7 @@ import (
 // using identical parameters for both so layout and painting agree.
 type textPainter struct {
 	shaper *text.Shaper
+	body   string // typeface of text that isn't code
 	cache  map[measureKey]render.Metrics
 	glyphs []text.Glyph
 }
@@ -32,11 +33,11 @@ type measureKey struct {
 const maxMeasureCache = 100000
 
 func newTextPainter(s *text.Shaper) *textPainter {
-	return &textPainter{shaper: s, cache: map[measureKey]render.Metrics{}}
+	return &textPainter{shaper: s, body: "Go", cache: map[measureKey]render.Metrics{}}
 }
 
-func giofont(f render.FontSpec) font.Font {
-	ft := font.Font{Typeface: "Go"}
+func (t *textPainter) font(f render.FontSpec) font.Font {
+	ft := font.Font{Typeface: font.Typeface(t.body)}
 	if f.Mono {
 		ft.Typeface = "Go Mono"
 	}
@@ -51,7 +52,7 @@ func giofont(f render.FontSpec) font.Font {
 
 func (t *textPainter) shape(f render.FontSpec, size float32, s string) []text.Glyph {
 	t.shaper.LayoutString(text.Parameters{
-		Font:     giofont(f),
+		Font:     t.font(f),
 		PxPerEm:  fixed.Int26_6(size * 64),
 		MaxWidth: 1 << 24,
 	}, s)

@@ -16,6 +16,7 @@ import (
 
 	"mdedit/internal/imgcache"
 	"mdedit/internal/mdmodel"
+	"mdedit/internal/sysfont"
 )
 
 // TestScreenshot renders the window offscreen to PNG files. Set MDEDIT_SHOT
@@ -173,6 +174,27 @@ func (s *shooter) contentScenes() {
 	s.spellingScene()
 	s.outlineScenes()
 	s.caretScenes()
+	s.fontScenes()
+}
+
+// fontScenes show the font dialog and the preview in an installed font.
+func (s *shooter) fontScenes() {
+	a := s.h.a
+	a.families = sysfont.Scan()
+	if len(a.families) == 0 {
+		return
+	}
+	a.cmdFonts(layout.Context{})
+	s.shot("dialog-font.png")
+	name := a.families[len(a.families)/2].Name
+	for _, f := range a.families {
+		if f.Name == "Baskerville" {
+			name = f.Name
+		}
+	}
+	a.fontChosen(name)
+	s.scene("font.png", fontSample)
+	a.fontChosen(defaultFontName)
 }
 
 // caretScenes show the block caret on a letter, in both themes.
@@ -268,3 +290,7 @@ const tocSample = "# Guide\n\n## Install\n\n### Linux\n\n### FreeBSD\n\n## Usage
 
 const spellingSample = "# Speling\n\nThis sentense has a fwe mistakes, but `codde`, $x^2$ maths and\n" +
 	"[links](https://exampel.com) are left alone. Recieve the definately seperate words.\n"
+
+const fontSample = "# Een titel met één héél lange kop\n\nEen alinea in **vet**, *cursief* en ***beide***, met " +
+	"“aanhalingstekens” — café, reünie, Straße, ÄÖÜ. Inline `code stays mono` hier.\n\n## Tweede kop\n\n" +
+	"- Een lijst met $x^2 + y^2 = z^2$ maths\n\n```go\nfunc main() {}\n```\n"

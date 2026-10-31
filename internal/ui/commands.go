@@ -244,16 +244,18 @@ func (a *App) insertMenu() *menu {
 }
 
 func (a *App) viewMenu() *menu {
-	return &menu{title: "View", items: []*command{
+	items := []*command{
 		newCommand("Editor and Preview", "", 0, viewChoice{a, viewSplit}.run),
 		newCommand("Editor Only", "", 0, viewChoice{a, viewEditor}.run),
 		newCommand("Preview Only", "", 0, viewChoice{a, viewPreview}.run),
 		nil,
 		a.cmds.outline,
 		a.cmds.theme,
-		nil,
-		newCommand("Cycle Views", "/", 0, a.cmdCycleView),
-	}}
+	}
+	if systemFontsSupported {
+		items = append(items, newCommand("Document Font…", "", 0, a.cmdFonts))
+	}
+	return &menu{title: "View", items: append(items, nil, newCommand("Cycle Views", "/", 0, a.cmdCycleView))}
 }
 
 func (a *App) helpMenu() *menu {

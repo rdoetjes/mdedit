@@ -96,6 +96,9 @@ func (a *App) autosave() {
 	}
 }
 
+// systemFontsSupported: a web page can't read the installed fonts.
+const systemFontsSupported = false
+
 // recentFilesSupported: a web page can't reopen a file from the disk
 // without the user picking it again, so there are no recent files.
 const recentFilesSupported = false

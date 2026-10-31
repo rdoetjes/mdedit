@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/go-pdf/fpdf"
+	"golang.org/x/image/font/gofont/gomono"
 
 	"mdedit/internal/mdmodel"
 	"mdedit/internal/render"
+	"mdedit/internal/sysfont"
 	"mdedit/internal/tex"
 )
 
@@ -39,8 +41,12 @@ func TestExportTestFile(t *testing.T) {
 // Characters missing from the Go fonts (⌘, ⇧, ⌫ …) are drawn from the maths
 // font instead of showing as empty boxes, and measured at that width.
 func TestFallbackGlyphs(t *testing.T) {
-	e := &exporter{pdf: fpdf.New("P", "pt", "A4", ""), coverage: map[coverKey]bool{}}
-	registerFonts(e.pdf)
+	fonts, err := newFonts(sysfont.Set{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &exporter{pdf: fpdf.New("P", "pt", "A4", ""), coverage: map[coverKey]bool{}, fonts: fonts}
+	registerFonts(e.pdf, fonts)
 	f := render.FontSpec{}
 	got := e.pieces(f, "Press ⌘⇧S or ⌘⌫ now")
 	want := []piece{{"Press ", false}, {"⌘⇧", true}, {"S or ", false}, {"⌘⌫", true}, {" now", false}}
@@ -65,5 +71,45 @@ func TestFallbackGlyphs(t *testing.T) {
 	doc := mdmodel.Parse([]byte("Use ⌘S to save, ⇧⌘S to save as, ⌘⌫ to delete."))
 	if err := Write(&buf, doc, Options{}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A chosen font replaces the text faces; code stays in Go Mono. Go Mono as
+// the "chosen" font shows it: all letters are equally wide.
+func TestChosenFont(t *testing.T) {
+	fonts, err := newFonts(sysfont.Set{Name: "test", TTF: [4][]byte{gomono.TTF}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &exporter{pdf: fpdf.New("P", "pt", "A4", ""), coverage: map[coverKey]bool{}, fonts: fonts}
+	registerFonts(e.pdf, fonts)
+	body := render.FontSpec{}
+	if a, b := e.measure(body, 10, "iiii"), e.measure(body, 10, "MMMM"); a.Width != b.Width {
+		t.Errorf("widths %v and %v: the chosen font isn't used", a.Width, b.Width)
+	}
+	bold := render.FontSpec{Bold: true} // the font has no bold: its regular is used
+	if a, b := e.measure(bold, 10, "iiii"), e.measure(bold, 10, "MMMM"); a.Width != b.Width {
+		t.Errorf("bold widths %v and %v: a missing style isn't the regular face", a.Width, b.Width)
+	}
+	var buf bytes.Buffer
+	opt := Options{Font: sysfont.Set{TTF: [4][]byte{gomono.TTF}}}
+	if err := Write(&buf, mdmodel.Parse([]byte("# Title\n\nText **bold** `code` äöü.\n")), opt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The Go fonts keep the metrics the layout has always used.
+func TestGoFontMetrics(t *testing.T) {
+	fonts, err := newFonts(sysfont.Set{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range fonts {
+		if d := f.ascent - ascent; d > 0.0005 || d < -0.0005 {
+			t.Errorf("%s %q: ascent %v, want %v", f.family, f.style, f.ascent, ascent)
+		}
+		if d := f.descent - descent; d > 0.0005 || d < -0.0005 {
+			t.Errorf("%s %q: descent %v, want %v", f.family, f.style, f.descent, descent)
+		}
 	}
 }

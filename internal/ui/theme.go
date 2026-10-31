@@ -8,6 +8,7 @@ import (
 	"gioui.org/x/pref/theme"
 
 	"mdedit/internal/render"
+	"mdedit/internal/sysfont"
 )
 
 // settings are the preferences kept between runs.
@@ -18,6 +19,8 @@ type settings struct {
 	Languages  []string `json:"languages,omitempty"` // spelling languages; English if none
 	Outline    bool     `json:"outline,omitempty"`   // show the outline sidebar
 	Recent     []string `json:"recent,omitempty"`    // recently used files, newest first
+	// Font is the document font; nil for the built-in one.
+	Font *sysfont.Family `json:"font,omitempty"`
 }
 
 func loadSettings() settings {

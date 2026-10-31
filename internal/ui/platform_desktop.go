@@ -33,6 +33,9 @@ func (a *App) handleArrivals() {}
 // saveRecovery for unsaved work.
 func (a *App) autosave() {}
 
+// systemFontsSupported: the desktop can read the installed fonts.
+const systemFontsSupported = true
+
 // recentFilesSupported: the desktop can reopen files by their path.
 const recentFilesSupported = true
 
