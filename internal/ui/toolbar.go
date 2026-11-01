@@ -2,8 +2,10 @@ package ui
 
 import (
 	"image"
+	"path/filepath"
 
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -22,9 +24,13 @@ func barWithBottomLine(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: sz}
 }
 
+// toolbarRight is the toolbar's right margin, in dp.
+const toolbarRight = 10
+
 func (a *App) toolbarContent(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.Inset{Top: 3, Bottom: 4, Left: 8, Right: 10}.Layout(gtx, a.toolbarItems)
+	a.toolW = gtx.Constraints.Max.X
+	return layout.Inset{Top: 3, Bottom: 4, Left: 8, Right: toolbarRight}.Layout(gtx, a.toolbarItems)
 }
 
 func (a *App) toolbarItems(gtx layout.Context) layout.Dimensions {
@@ -36,8 +42,32 @@ func (a *App) toolbarItems(gtx layout.Context) layout.Dimensions {
 			children = append(children, layout.Rigid(toolbarButton{a: a, c: c}.layout))
 		}
 	}
-	children = append(children, layout.Flexed(1, a.fileName))
+	children = append(children, layout.Flexed(1, a.toolbarRest))
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+}
+
+// toolbarRest fills the toolbar after the buttons: the font box, lined up
+// with the preview, then the document's name.
+func (a *App) toolbarRest(gtx layout.Context) layout.Dimensions {
+	if !systemFontsSupported || a.view == viewEditor {
+		a.fontBox.hide()
+		return a.fileName(gtx)
+	}
+	x := a.toolW - gtx.Dp(toolbarRight) - gtx.Constraints.Max.X
+	gap := max(a.previewLeft(gtx, a.toolW)+gtx.Dp(10)-x, gtx.Dp(8))
+	a.fontBox.x = x + gap
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(pixelGap(gap).layout),
+		layout.Rigid(a.fontBox.layout),
+		layout.Flexed(1, a.fileName),
+	)
+}
+
+// pixelGap is an empty width, in pixels.
+type pixelGap int
+
+func (g pixelGap) layout(layout.Context) layout.Dimensions {
+	return layout.Dimensions{Size: image.Pt(int(g), 0)}
 }
 
 func toolbarSeparator(gtx layout.Context) layout.Dimensions {
@@ -46,12 +76,24 @@ func toolbarSeparator(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: image.Pt(w, h)}
 }
 
+// documentName is the path of the document, or just its file name if the
+// path doesn't fit in the given width.
+func (a *App) documentName(gtx layout.Context, width int) string {
+	if a.path == "" {
+		return "Untitled"
+	}
+	macro := op.Record(gtx.Ops)
+	w := measureLabel(gtx, a.th, a.path)
+	macro.Stop()
+	if w > width {
+		return filepath.Base(a.path)
+	}
+	return a.path
+}
+
 // fileName shows the document path, marked when there are unsaved changes.
 func (a *App) fileName(gtx layout.Context) layout.Dimensions {
-	name := "Untitled"
-	if a.path != "" {
-		name = a.path
-	}
+	name := a.documentName(gtx, gtx.Constraints.Max.X-gtx.Dp(24))
 	if a.dirty {
 		name += "  •"
 	}

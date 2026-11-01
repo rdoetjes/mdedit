@@ -200,13 +200,18 @@ func (a *App) cmdToggleOutline(layout.Context) {
 	a.saveSettings(st, "the outline setting")
 }
 
+// outlineW is the outline's width in a window of the given width.
+func (a *App) outlineW(gtx layout.Context, width int) int {
+	return min(gtx.Dp(outlineWidth), width/3)
+}
+
 // mainArea lays out the outline, if shown, left of the panes.
 func (a *App) mainArea(gtx layout.Context) layout.Dimensions {
 	if !a.outline.open {
 		return a.panes(gtx)
 	}
 	size := gtx.Constraints.Max
-	w := min(gtx.Dp(outlineWidth), size.X/3)
+	w := a.outlineW(gtx, size.X)
 	layoutAt(gtx, 0, w, a.outline.layout)
 	fillRect(gtx, col.dividerCol, image.Rect(w, 0, w+1, size.Y))
 	layoutAt(gtx, w+1, size.X-w-1, a.panes)

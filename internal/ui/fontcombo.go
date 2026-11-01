@@ -18,7 +18,7 @@ import (
 	"mdedit/internal/sysfont"
 )
 
-// fontCombo is the "PDF font" combo box above the preview: a text field
+// fontCombo is the "PDF font" combo box in the toolbar: a text field
 // showing the chosen font, with a button that drops down the list of
 // fonts. Typing filters the list; clicking an entry (or Enter) chooses it.
 // Escape or a click elsewhere goes back to the chosen font.
@@ -38,10 +38,10 @@ type fontCombo struct {
 	shown   []string // those matching the text in the field
 	query   string   // the text shown was filtered by
 	hot     int      // index in shown of the highlighted entry
-	// box is the field and button in the bar; dropped the list below it,
-	// as last drawn. height is the bar's height.
+	// box is the field and button, and dropped the list below it, as last
+	// drawn, relative to the combo box; x is where that is in the window.
 	box, dropped image.Rectangle
-	height       int
+	x            int
 	arrowW       int
 }
 
@@ -106,6 +106,14 @@ func (c *fontCombo) shut() {
 	c.open = false
 	c.field.SetText(c.a.fontName())
 	c.query = c.a.fontName()
+}
+
+// hide closes the list when the box goes away with the preview.
+func (c *fontCombo) hide() {
+	if c.open {
+		c.shut()
+		c.a.focusEditor = true
+	}
 }
 
 // choose makes name the font and hands the keyboard back to the editor.
@@ -232,12 +240,10 @@ func (c *fontCombo) handleDismiss(gtx layout.Context) {
 	}
 }
 
-// layout draws the bar with the box; the list goes over the window.
+// layout draws the box; the list goes over the window.
 func (c *fontCombo) layout(gtx layout.Context) layout.Dimensions {
 	c.handleInput(gtx)
-	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	dims := layout.Background{}.Layout(gtx, barWithBottomLine, c.padded)
-	c.height = dims.Size.Y
+	dims := c.row(gtx)
 	if c.open {
 		macro := op.Record(gtx.Ops)
 		c.drawDropped(gtx)
@@ -246,15 +252,12 @@ func (c *fontCombo) layout(gtx layout.Context) layout.Dimensions {
 	return dims
 }
 
-func (c *fontCombo) padded(gtx layout.Context) layout.Dimensions {
-	return layout.Inset{Top: 5, Bottom: 5, Left: 10, Right: 10}.Layout(gtx, c.row)
-}
-
 func (c *fontCombo) row(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(c.label),
 		hspace(8),
 		layout.Rigid(c.combo),
+		hspace(12),
 	)
 }
 
@@ -262,7 +265,7 @@ func (c *fontCombo) label(gtx layout.Context) layout.Dimensions {
 	l := material.Caption(c.a.th, "PDF font")
 	l.Color = col.statusFg
 	dims := l.Layout(gtx)
-	c.box.Min.X = dims.Size.X + gtx.Dp(10+8)
+	c.box.Min.X = dims.Size.X + gtx.Dp(8)
 	return dims
 }
 
@@ -271,7 +274,7 @@ func (c *fontCombo) combo(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(260))
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	dims := framed(gtx, c.inside)
-	c.box.Min.Y = gtx.Dp(5)
+	c.box.Min.Y = 0
 	c.box.Max = c.box.Min.Add(dims.Size)
 	area := clip.Rect{Max: image.Pt(dims.Size.X-c.arrowW, dims.Size.Y)}.Push(gtx.Ops)
 	pass := pointer.PassOp{}.Push(gtx.Ops)

@@ -11,6 +11,9 @@ import (
 	"testing"
 
 	"gioui.org/io/key"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/unit"
 	"golang.org/x/image/font/gofont/gomono"
 
 	"mdedit/internal/render"
@@ -79,10 +82,9 @@ func TestDocumentFontGone(t *testing.T) {
 	}
 }
 
-// comboPoint returns a window position in the font box's bar.
+// comboPoint returns the window position of a point in the font box.
 func (h *harness) comboPoint(p image.Point) (float32, float32) {
-	left := int(h.a.split*float32(h.size.X)) + 12 // the editor and divider
-	return float32(left + p.X), float32(h.a.barH + h.a.toolH + p.Y)
+	return float32(h.a.fontBox.x + p.X), float32(h.a.barH + 6 + p.Y) // the toolbar's 3 dp margin
 }
 
 // openCombo clicks the field, which drops the list.
@@ -158,7 +160,7 @@ func TestComboClickAway(t *testing.T) {
 	h := newHarness(t, "")
 	c := h.openCombo(monoFamily(t))
 	h.typeInCombo("mono")
-	h.click(h.comboPoint(image.Pt(600, 900)))
+	h.click(float32(h.size.X/2), 900)
 	if c.open || c.field.Text() != defaultFontName || h.a.bodyFont.Name != "" {
 		t.Errorf("open %v, field %q, font %q", c.open, c.field.Text(), h.a.bodyFont.Name)
 	}
@@ -182,5 +184,39 @@ func TestSavedFontForCommandLine(t *testing.T) {
 	set, err := SavedFont()
 	if err != nil || set.Name != "Test Mono" || set.TTF[sysfont.Regular] == nil {
 		t.Errorf("SavedFont = %q, %v", set.Name, err)
+	}
+}
+
+// A path too long for the toolbar shows as the file name.
+func TestDocumentNameFits(t *testing.T) {
+	h := newHarness(t, "")
+	h.a.path = "/some/very/long/folder/name/that/goes/on/chapter.md"
+	gtx := layout.Context{Ops: new(op.Ops), Metric: unit.Metric{PxPerDp: 2, PxPerSp: 2}}
+	if got := h.a.documentName(gtx, 100); got != "chapter.md" {
+		t.Errorf("name %q in a narrow space", got)
+	}
+	if got := h.a.documentName(gtx, 5000); got != h.a.path {
+		t.Errorf("name %q with room to spare", got)
+	}
+}
+
+// The box sits in the toolbar at the preview's left edge, and follows the
+// divider; without a preview it hides.
+func TestComboAboveThePreview(t *testing.T) {
+	h := newHarness(t, "")
+	want := int(h.a.split*float32(h.size.X)) + 12 + 20 // divider, and 10 dp in
+	if h.a.fontBox.x != want {
+		t.Errorf("box at x=%d, want %d", h.a.fontBox.x, want)
+	}
+	h.a.split = 0.4
+	h.frame()
+	if want := int(0.4*float32(h.size.X)) + 12 + 20; h.a.fontBox.x != want {
+		t.Errorf("box at x=%d after moving the divider, want %d", h.a.fontBox.x, want)
+	}
+	h.a.fontBox.drop()
+	h.a.view = viewEditor
+	h.frame()
+	if h.a.fontBox.open {
+		t.Error("the list stays open without a preview")
 	}
 }

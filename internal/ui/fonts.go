@@ -14,8 +14,8 @@ import (
 // The document font: the font of the text and headings in the preview and
 // the PDF. Code keeps Go Mono, and the editor too. The chosen family is
 // kept in the settings by the files of its faces, so starting mdedit needs
-// no scan of the installed fonts; that happens when the combo box above
-// the preview (fontcombo.go) first opens. The
+// no scan of the installed fonts; that happens when the combo box in the
+// toolbar (fontcombo.go) first opens. The
 // same standalone TrueType files go to the preview and the PDF.
 
 // defaultFontName is the combo box's entry for the built-in Go font.

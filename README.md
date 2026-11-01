@@ -113,7 +113,7 @@ Dutch or German text full of English terms. Compound words (Dutch
 "l'homme") are understood. In the browser the dictionaries are downloaded
 again on each visit.
 
-The PDF font box above the preview chooses the font of the text and headings
+The PDF font box in the toolbar, above the preview, chooses the font of the text and headings
 in the preview and the PDF from the fonts installed on your computer. Drop
 down the list with the arrow, or click in the box and type to filter it; click
 an entry (or use the arrow keys and Enter) to choose it. Escape or a click

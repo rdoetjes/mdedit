@@ -11,8 +11,12 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/unit"
 	"gioui.org/widget/material"
 )
+
+// dividerWidth is the width of the divider between the editor and preview.
+const dividerWidth = unit.Dp(6)
 
 // panes lays out the editor and/or preview according to the view mode.
 func (a *App) panes(gtx layout.Context) layout.Dimensions {
@@ -25,27 +29,28 @@ func (a *App) panes(gtx layout.Context) layout.Dimensions {
 	return a.splitPanes(gtx)
 }
 
-// previewPane is the preview, with the font box above it where installed
-// fonts can be used.
 func (a *App) previewPane(gtx layout.Context) layout.Dimensions {
-	if !systemFontsSupported {
-		return a.previewView(gtx)
-	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(a.fontBox.layout),
-		layout.Flexed(1, a.previewView),
-	)
+	return a.preview.Layout(gtx, a.th)
 }
 
-func (a *App) previewView(gtx layout.Context) layout.Dimensions {
-	return a.preview.Layout(gtx, a.th)
+// previewLeft returns where the preview starts in a window of the given
+// width, as mainArea and splitPanes lay it out.
+func (a *App) previewLeft(gtx layout.Context, width int) int {
+	x := 0
+	if a.outline.open {
+		x = a.outlineW(gtx, width) + 1
+	}
+	if a.view == viewSplit {
+		x += int(a.split*float32(width-x)) + gtx.Dp(dividerWidth)
+	}
+	return x
 }
 
 // splitPanes puts the editor and preview side by side with a draggable
 // divider between them.
 func (a *App) splitPanes(gtx layout.Context) layout.Dimensions {
 	size := gtx.Constraints.Max
-	divW := gtx.Dp(6)
+	divW := gtx.Dp(dividerWidth)
 	a.handleDividerDrag(gtx, size.X)
 	leftW := int(a.split * float32(size.X))
 	layoutAt(gtx, 0, leftW, a.editorPane)

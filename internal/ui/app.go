@@ -80,6 +80,7 @@ type App struct {
 	// fontArrival.
 	bodyFont    sysfont.Set
 	fontBox     fontCombo
+	toolW       int // the toolbar's width
 	families    []sysfont.Family
 	fontArrival chan []sysfont.Family
 	// runes is the text as of the last reparse, and lines the rune offset
