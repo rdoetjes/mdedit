@@ -71,7 +71,7 @@ func (h *harness) previewPoint(b, k, n int) (float32, float32) {
 	pr := textPrims(p.blockLayout(b))[k]
 	left := float32(int(h.a.split*float32(h.size.X)) + 12) // the editor and the divider (6 dp)
 	x := pr.X + p.text.measure(pr.Font, pr.Size, string([]rune(pr.Text)[:n])).Width + 2
-	return left + p.ox + x, float32(h.a.barH+h.a.toolH) + y + pr.Y - pr.Size/3
+	return left + p.ox + x, float32(h.a.barH+h.a.toolH+h.a.fontBox.height) + y + pr.Y - pr.Size/3
 }
 
 func textPrims(l *render.Layout) []render.Prim {
@@ -177,7 +177,7 @@ func (h *harness) previewPointAt(b, k, n int) (float32, float32) {
 	pr := textPrims(p.blockLayout(b))[k]
 	left := float32(int(h.a.split*float32(h.size.X)) + 12)
 	x := pr.X + p.text.measure(pr.Font, pr.Size, string([]rune(pr.Text)[:n])).Width + 2
-	return left + p.ox + x, float32(h.a.barH+h.a.toolH) + pr.Y - pr.Size/3
+	return left + p.ox + x, float32(h.a.barH+h.a.toolH+h.a.fontBox.height) + pr.Y - pr.Size/3
 }
 
 func (h *harness) editorFocused() bool { return h.router.Source().Focused(&h.a.editor) }

@@ -25,7 +25,19 @@ func (a *App) panes(gtx layout.Context) layout.Dimensions {
 	return a.splitPanes(gtx)
 }
 
+// previewPane is the preview, with the font box above it where installed
+// fonts can be used.
 func (a *App) previewPane(gtx layout.Context) layout.Dimensions {
+	if !systemFontsSupported {
+		return a.previewView(gtx)
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(a.fontBox.layout),
+		layout.Flexed(1, a.previewView),
+	)
+}
+
+func (a *App) previewView(gtx layout.Context) layout.Dimensions {
 	return a.preview.Layout(gtx, a.th)
 }
 

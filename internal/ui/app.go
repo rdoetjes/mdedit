@@ -79,6 +79,7 @@ type App struct {
 	// families are the installed fonts, once scanned, which arrive through
 	// fontArrival.
 	bodyFont    sysfont.Set
+	fontBox     fontCombo
 	families    []sysfont.Family
 	fontArrival chan []sysfont.Family
 	// runes is the text as of the last reparse, and lines the rune offset
@@ -135,6 +136,7 @@ func New(path string) (*App, error) {
 	a.outline.init(a, st)
 	a.recent = st.Recent
 	a.restoreFont(st)
+	a.fontBox.init(a)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

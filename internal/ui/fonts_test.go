@@ -3,13 +3,14 @@
 package ui
 
 import (
+	"image"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"gioui.org/layout"
+	"gioui.org/io/key"
 	"golang.org/x/image/font/gofont/gomono"
 
 	"mdedit/internal/render"
@@ -35,10 +36,9 @@ func (h *harness) bodyIsMono() bool {
 
 func (h *harness) chooseFont(name string, fams ...sysfont.Family) {
 	h.a.families = fams
-	h.run(newCommand("", "", 0, h.a.cmdFonts))
-	d := h.a.dialog.(*FontDialog)
-	d.selected = name
-	d.done(d.selected)
+	h.a.fontBox.setFamilies(fams)
+	h.a.fontBox.choose(name)
+	h.frame()
 	h.frame()
 }
 
@@ -53,11 +53,12 @@ func TestDocumentFont(t *testing.T) {
 	if !h.bodyIsMono() || h.a.bodyFont.Name != "Test Mono" {
 		t.Fatal("the chosen font is not used in the preview")
 	}
-	if h.a.dialog != nil || !h.a.focusEditor && !h.editorFocused() {
-		t.Error("the dialog should close and give the editor the focus back")
+	if !h.editorFocused() {
+		t.Error("the editor should get the keyboard focus back")
 	}
-	if !h.restart().bodyIsMono() {
-		t.Error("the font is not restored at the next start")
+	next := h.restart()
+	if !next.bodyIsMono() || next.a.fontBox.field.Text() != "Test Mono" {
+		t.Errorf("after a restart the box shows %q", next.a.fontBox.field.Text())
 	}
 	h.chooseFont(defaultFontName, f)
 	if h.bodyIsMono() || h.a.bodyFont.Name != "" || loadSettings().Font != nil {
@@ -78,26 +79,98 @@ func TestDocumentFontGone(t *testing.T) {
 	}
 }
 
-func TestFontDialogFilter(t *testing.T) {
-	d := newFontDialog(defaultFontName, nil)
-	if d.names != nil {
-		t.Fatal("no fonts should be listed before the scan ends")
+// comboPoint returns a window position in the font box's bar.
+func (h *harness) comboPoint(p image.Point) (float32, float32) {
+	left := int(h.a.split*float32(h.size.X)) + 12 // the editor and divider
+	return float32(left + p.X), float32(h.a.barH + h.a.toolH + p.Y)
+}
+
+// openCombo clicks the field, which drops the list.
+func (h *harness) openCombo(fams ...sysfont.Family) *fontCombo {
+	c := &h.a.fontBox
+	h.a.families = fams
+	c.setFamilies(fams)
+	h.frame()
+	h.click(h.comboPoint(c.box.Min.Add(image.Pt(30, 10))))
+	h.frame()
+	if !c.open {
+		h.t.Fatal("clicking the field did not drop the list")
 	}
-	d.setFamilies([]sysfont.Family{{Name: "Arial"}, {Name: "Georgia"}, {Name: "Arial Black"}})
-	d.filter.SetText("ARIAL")
-	d.applyFilter()
-	if !slices.Equal(d.shown, []string{"Arial", "Arial Black"}) {
-		t.Errorf("shown %q", d.shown)
+	return c
+}
+
+func (h *harness) typeInCombo(s string) {
+	h.a.fontBox.field.SetText(s)
+	h.frame()
+	h.frame()
+}
+
+func TestComboFilters(t *testing.T) {
+	h := newHarness(t, "")
+	c := h.openCombo(sysfont.Family{Name: "Arial"}, sysfont.Family{Name: "Georgia"}, sysfont.Family{Name: "Arial Black"})
+	if len(c.shown) != 4 {
+		t.Errorf("shown %q; the chosen name in the field should not filter", c.shown)
+	}
+	h.typeInCombo("ARIAL")
+	if !slices.Equal(c.shown, []string{"Arial", "Arial Black"}) {
+		t.Errorf("shown %q", c.shown)
+	}
+	h.press(key.NameEscape, 0)
+	if c.open || c.field.Text() != defaultFontName || h.a.bodyFont.Name != "" {
+		t.Errorf("Escape: open %v, field %q", c.open, c.field.Text())
 	}
 }
 
-// The dialog fills in when the background scan ends.
-func TestFontScanArrives(t *testing.T) {
+// Clicking an entry chooses the font; the field shows it.
+func TestComboClickChooses(t *testing.T) {
 	h := newHarness(t, "")
-	h.a.cmdFonts(layout.Context{})
+	h.setText("Text.\n", 0, 0)
+	c := h.openCombo(monoFamily(t))
+	h.typeInCombo("mono")
+	if len(c.shown) != 1 {
+		t.Fatalf("shown %q", c.shown)
+	}
+	h.click(h.comboPoint(c.dropped.Min.Add(image.Pt(20, 12))))
+	if c.open || c.field.Text() != "Test Mono" || !h.bodyIsMono() {
+		t.Errorf("open %v, field %q, font used %v", c.open, c.field.Text(), h.bodyIsMono())
+	}
+	if !h.editorFocused() {
+		t.Error("the editor should get the keyboard focus back")
+	}
+}
+
+// Enter chooses the highlighted entry, and the arrow keys move it.
+func TestComboKeyboard(t *testing.T) {
+	h := newHarness(t, "")
+	c := h.openCombo(monoFamily(t))
+	h.press(key.NameDownArrow, 0)
+	if c.hot != 1 {
+		t.Fatalf("highlighted entry %d, want 1", c.hot)
+	}
+	h.press(key.NameReturn, 0)
+	if h.a.bodyFont.Name != "Test Mono" {
+		t.Errorf("font %q after Enter", h.a.bodyFont.Name)
+	}
+}
+
+// A click elsewhere closes the list and keeps the chosen font.
+func TestComboClickAway(t *testing.T) {
+	h := newHarness(t, "")
+	c := h.openCombo(monoFamily(t))
+	h.typeInCombo("mono")
+	h.click(h.comboPoint(image.Pt(600, 900)))
+	if c.open || c.field.Text() != defaultFontName || h.a.bodyFont.Name != "" {
+		t.Errorf("open %v, field %q, font %q", c.open, c.field.Text(), h.a.bodyFont.Name)
+	}
+}
+
+// The list fills in when the background scan ends, without a dialog.
+func TestComboScanArrives(t *testing.T) {
+	h := newHarness(t, "")
+	h.a.scanFonts()
 	h.waitFor(fontsScanned)
-	if d := h.a.dialog.(*FontDialog); d.names == nil || d.names[0] != defaultFontName {
-		t.Errorf("names %q", d.names)
+	if c := h.a.fontBox; c.names == nil || c.names[0] != defaultFontName {
+		t.Errorf("names %q", c.names)
 	}
 }
 

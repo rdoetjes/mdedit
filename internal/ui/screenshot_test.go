@@ -177,24 +177,26 @@ func (s *shooter) contentScenes() {
 	s.fontScenes()
 }
 
-// fontScenes show the font dialog and the preview in an installed font.
+// fontScenes show the font list and the preview in an installed font.
 func (s *shooter) fontScenes() {
 	a := s.h.a
 	a.families = sysfont.Scan()
 	if len(a.families) == 0 {
 		return
 	}
-	a.cmdFonts(layout.Context{})
-	s.shot("dialog-font.png")
+	a.fontBox.setFamilies(a.families)
+	a.fontBox.drop()
+	s.shot("font-combo.png")
+	a.fontBox.shut()
 	name := a.families[len(a.families)/2].Name
 	for _, f := range a.families {
 		if f.Name == "Baskerville" {
 			name = f.Name
 		}
 	}
-	a.fontChosen(name)
+	a.fontBox.choose(name)
 	s.scene("font.png", fontSample)
-	a.fontChosen(defaultFontName)
+	a.fontBox.choose(defaultFontName)
 }
 
 // caretScenes show the block caret on a letter, in both themes.

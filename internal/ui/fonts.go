@@ -6,7 +6,6 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
-	"gioui.org/layout"
 	"gioui.org/text"
 
 	"mdedit/internal/sysfont"
@@ -15,10 +14,11 @@ import (
 // The document font: the font of the text and headings in the preview and
 // the PDF. Code keeps Go Mono, and the editor too. The chosen family is
 // kept in the settings by the files of its faces, so starting mdedit needs
-// no scan of the installed fonts; that happens when the dialog opens. The
+// no scan of the installed fonts; that happens when the combo box above
+// the preview (fontcombo.go) first opens. The
 // same standalone TrueType files go to the preview and the PDF.
 
-// defaultFontName is the dialog's entry for the built-in Go font.
+// defaultFontName is the combo box's entry for the built-in Go font.
 const defaultFontName = "Go (built in)"
 
 // bodyTypeface is the name the chosen font has in the preview's shaper.
@@ -95,32 +95,26 @@ func bodyStyle(i int) font.Font {
 	return f
 }
 
-// cmdFonts opens the font dialog, and looks for the installed fonts the
-// first time.
-func (a *App) cmdFonts(layout.Context) {
-	d := newFontDialog(a.fontName(), a.fontChosen)
-	d.setFamilies(a.families)
-	a.dialog = d
+// scanFonts looks for the installed fonts, the first time it is called.
+func (a *App) scanFonts() {
 	if a.families == nil && a.fontArrival == nil {
 		a.fontArrival = make(chan []sysfont.Family, 1)
-		go scanFonts(a.fontArrival, a.invalidate)
+		go scanInBackground(a.fontArrival, a.invalidate)
 	}
 }
 
-// scanFonts runs on its own goroutine.
-func scanFonts(out chan<- []sysfont.Family, wake func()) {
+// scanInBackground runs on its own goroutine.
+func scanInBackground(out chan<- []sysfont.Family, wake func()) {
 	defer wake()
 	out <- sysfont.Scan()
 }
 
-// handleFontScan takes the result of a scan, and gives it to the dialog.
+// handleFontScan takes the result of a scan, for the combo box.
 func (a *App) handleFontScan() {
 	select {
 	case fams := <-a.fontArrival:
 		a.families, a.fontArrival = fams, nil
-		if d, ok := a.dialog.(*FontDialog); ok {
-			d.setFamilies(fams)
-		}
+		a.fontBox.setFamilies(fams)
 	default:
 	}
 }
@@ -132,17 +126,14 @@ func (a *App) fontName() string {
 	return a.bodyFont.Name
 }
 
-// fontChosen applies and saves the font chosen in the dialog; name is
-// empty if it was cancelled.
+// fontChosen applies and saves a font chosen in the combo box.
 func (a *App) fontChosen(name string) {
-	a.dialog = nil
-	a.focusEditor = true
-	if name == "" || name == a.fontName() {
+	if name == a.fontName() {
 		return
 	}
 	st := loadSettings()
 	st.Font = a.applyFont(name)
-	a.saveSettings(st, "the document font")
+	a.saveSettings(st, "the PDF font")
 }
 
 // applyFont switches to a family by name, and returns what to save: the
@@ -156,7 +147,7 @@ func (a *App) applyFont(name string) *sysfont.Family {
 			a.setStatus("Could not load the font %s: %v", name, err)
 			break
 		}
-		a.setStatus("Document font: %s", name)
+		a.setStatus("PDF font: %s", name)
 		return &a.families[i]
 	}
 	a.useDefaultFont()

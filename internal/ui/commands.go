@@ -252,9 +252,6 @@ func (a *App) viewMenu() *menu {
 		a.cmds.outline,
 		a.cmds.theme,
 	}
-	if systemFontsSupported {
-		items = append(items, newCommand("Document Font…", "", 0, a.cmdFonts))
-	}
 	return &menu{title: "View", items: append(items, nil, newCommand("Cycle Views", "/", 0, a.cmdCycleView))}
 }
 
