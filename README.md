@@ -3,7 +3,8 @@
 A Markdown editor with a live, GitHub-styled preview and PDF export, written
 in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and Wayland), FreeBSD, macOS and Windows.
 
-You are allowed to use this for non-commercial use. For commercial use, please contact us.
+Free for non-commercial use; commercial use needs a licence, see
+[License](#license).
 
 ![Screenshot](./screenshot.png)
 
@@ -18,6 +19,7 @@ You are allowed to use this for non-commercial use. For commercial use, please c
   - [In the browser (WebAssembly)](#in-the-browser-webassembly)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
+  - [License](#license)
 
 <!-- /toc -->
 
@@ -313,7 +315,7 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/youtube   YouTube URLs and video IDs
     internal/imgcache  downloads and caches YouTube stills
     internal/vfs       file storage for images: the disk, or memory in the browser
-    internal/lint      code-style test: no anonymous functions, ≤4 indent levels, ≤40-line functions
+    internal/lint      code-style test: only short closures, ≤4 indent levels, ≤40-line functions
     tools/mkicon       draws the application icon
     tools/glyphdump    prints how a character is stored in the font (see HOW_IT_WORKS.md §6)
     web/index.html     the web page around the browser version
@@ -326,4 +328,27 @@ See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for how the layers fit together, how
 input flows through the code, where to add features and where to look for
 bugs.
 
-© 2026 Phonax-Soft
+## License
+
+Copyright © 2026 Phonax-Soft.
+
+mdedit is free to use, change and share for non-commercial purposes under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). That covers personal use with
+no anticipated commercial application (study, hobby projects, amateur
+pursuits) and use by non-commercial organisations such as charities, schools,
+public research organisations and government institutions; the licence text
+decides what counts.
+
+**Commercial use needs a separate licence.** That includes using mdedit to
+write something you sell or are paid for, such as a book. To get a licence,
+e-mail the maintainer at the address on their
+[GitHub profile](https://github.com/rdoetjes), or open an
+[issue](https://github.com/rdoetjes/mdedit/issues).
+
+This makes mdedit source-available, not open source in the OSI sense. It comes
+without warranty, as the licence says. mdedit claims no rights in the documents
+you write with it.
+
+Parts by others stay under their own licences, listed in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). Spelling dictionaries aren't
+part of mdedit: they are downloaded on request, each under its own licence.

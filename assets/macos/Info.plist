@@ -28,7 +28,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>MDEdit — Markdown editor with live preview, maths and PDF export</string>
+	<string>Copyright © 2026 Phonax-Soft. Free for non-commercial use.</string>
 
 	<!-- Offer MDEdit in the Finder's "Open With" for Markdown files, without
 	     taking over as the default app. -->

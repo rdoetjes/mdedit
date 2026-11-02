@@ -351,7 +351,9 @@ func (a *App) tableChosen(cols, rows int) {
 
 func (a *App) about() {
 	a.dialog = &ConfirmDialog{
-		Message: "mdedit " + Version + "\n\nA Markdown editor with live preview and PDF export, written in Go with Gio.",
+		Message: "mdedit " + Version + "\n\nA Markdown editor with live preview and PDF export, written in Go with Gio.\n\n" +
+			"Copyright © 2026 Phonax-Soft. Free for non-commercial use; see the LICENSE file. " +
+			"Third-party licences: THIRD_PARTY_LICENSES.md.",
 		Buttons: []string{"OK"},
 		Done:    a.closeDialog,
 	}
