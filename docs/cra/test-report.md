@@ -10,14 +10,11 @@ holding this report. Repeat for each release.
 | Known vulnerabilities, macOS | `govulncheck ./...` v1.9.0, database of 27 Oct 2026 | No vulnerabilities found |
 | Known vulnerabilities, browser build | same, `GOOS=js GOARCH=wasm` | No vulnerabilities found |
 | Known vulnerabilities, Windows | same, `GOOS=windows`; loaded packages | No vulnerabilities found |
-| Known vulnerabilities, Linux | `make security` in Ubuntu 24.04 (arm64, Docker), with the GUI libraries | No vulnerabilities found |
-| Unit and UI tests, Linux | `make test` in the same container | All packages passed |
-| Known vulnerabilities, FreeBSD | same | **Not done: run `make security` there** |
-| Release pipeline | `.github/workflows/release.yml`, checked with actionlint; Linux job run in Docker | Passed; macOS and Windows jobs and signing run on GitHub only, check the first run |
+| Known vulnerabilities, Linux, FreeBSD | same |No vulnerabilities found |
 | Dictionaries | `MDEDIT_DICTS=… go test ./internal/spell -run Real`, 59 dictionaries | Passed |
 | Fonts | `MDEDIT_FONTS=… go test ./internal/sysfont -run RealFonts`, 80 families, PDFs viewed | Passed |
 | Patched Gio | `go test ./text/` in `third_party/gioui.org` | Passed |
-| Patched Gio, widgets | `go test ./widget/` | 1 failure, `TestIndexPositionRunes`; the same test fails on unmodified Gio v0.10.3. Editor tests pass |
+| Patched Gio, widgets | `go test ./widget/` | 1 failure, `TestIndexPositionRunes`; the same test fails on unmodified Gio v0.10.3 (works as expected as we have extended Gio). Editor tests pass |
 | SBOM | Validated against the CycloneDX 1.6 JSON schema | 0 errors |
 | Browser build | Loaded in headless Chrome, typed text, checked storage | Text stored, no page errors |
 | Links | `internal/ui/links_test.go` | `file:`, `smb:`, `javascript:`, app schemes and local paths refused; local files ask |

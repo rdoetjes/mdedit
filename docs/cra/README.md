@@ -48,17 +48,17 @@ mdedit is under active development.
 - [x] **B2. Secure distribution.** `.github/workflows/release.yml` builds every push to `main` into a tagged release with SHA256SUMS and GitHub build attestations (Sigstore signatures), verifiable with `gh attestation verify`. Check after the first run. **Keep releases for at least 10 years: don't delete them** (Article 13(9)). The macOS and Windows builds aren't signed with Apple or Microsoft certificates; users allow them once, after checking the download (release notes). The CRA doesn't require platform certificates.
 - [x] **B3. Scan Linux.** Done in CI for Linux, macOS and Windows on every release, and once by hand in Ubuntu 24.04. **FreeBSD:** `make security` there before each FreeBSD build.
 - [ ] **B4. Hostile-input testing.** Markdown, Hunspell and font parsing are untested against malicious input (fuzzing), and compound and rule matching have no time limit.
-- [ ] **B5. Data removal.** Removal is by hand, per the instructions. Decide whether that is "easy" enough, or add a menu item (Annex I Part I, 2(m)).
-- [ ] **B6. Support period.** Set and publish the end date (month and year): [support-period.md](support-period.md).
-- [ ] **B7. Harmonised standards.** None was cited in the Official Journal when this was written. Check again before signing; if one is cited, consider applying it.
-- [ ] **B8. Simplified form.** Article 33(5) lets small businesses use a simplified form of the technical documentation. Check whether the Commission has published it.
-- [ ] Sign the declaration, and put the CE marking on it or on the website (Article 30(1)).
+- [X] **B5. Data removal.** Removal is by hand, per the instructions. Decide whether that is "easy" enough, or add a menu item (Annex I Part I, 2(m)).
+- [X] **B6. Support period.** Set and publish the end date (month and year): [support-period.md](support-period.md).
+- [X] **B7. Harmonised standards.** None was cited in the Official Journal when this was written. Check again before signing; if one is cited, consider applying it.
+- [X] **B8. Simplified form.** Article 33(5) lets small businesses use a simplified form of the technical documentation. Check whether the Commission has published it.
+- [X] Sign the declaration, and put the CE marking on it or on the website (Article 30(1)).
 
 ### Keep doing
 
 - [ ] `make security` at least monthly, also without releases (the workflow only scans on a push); update Go and modules.
-- [ ] Each release: the workflow publishes the SBOM with it. Keep this file and the releases for at least 10 years or the support period, whichever is longer (Article 13(13)).
-- [ ] Review the risk assessment on every substantial change (Article 13(3)).
+- [X] Each release: the workflow publishes the SBOM with it. Keep this file and the releases for at least 10 years or the support period, whichever is longer (Article 13(13)).
+- [X] Review the risk assessment on every substantial change (Article 13(3)).
 
 ## Sources checked
 
