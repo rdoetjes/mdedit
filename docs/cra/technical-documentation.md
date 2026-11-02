@@ -50,7 +50,8 @@ Documents are data: nothing in a document is executed. Links are handled by
 [vulnerability-handling.md](vulnerability-handling.md), [SECURITY.md](../../SECURITY.md),
 SBOM in [sbom/](sbom/) and with each release. **Contact address:** in SECURITY.md.
 **Secure distribution of updates:** GitHub releases with checksums and signed build
-attestations; the browser version over HTTPS. Desktop update notification still open (B1).
+attestations; the browser version over HTTPS. The desktop version checks for a newer
+release at start-up and offers its page (`ui/updates.go`).
 
 ### (c) Production and monitoring
 

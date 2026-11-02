@@ -80,6 +80,7 @@ type App struct {
 	// fontArrival.
 	bodyFont    sysfont.Set
 	fontBox     fontCombo
+	updates     updateChecker
 	sizeBox     sizeBox
 	textSize    float32 // base text size of the document, in points
 	toolW       int     // the toolbar's width
@@ -141,6 +142,7 @@ func New(path string) (*App, error) {
 	a.restoreFont(st)
 	a.fontBox.init(a)
 	a.sizeBox.init(a, st)
+	a.startUpdateCheck(st)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

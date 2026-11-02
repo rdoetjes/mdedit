@@ -33,6 +33,9 @@ func (a *App) handleArrivals() {}
 // saveRecovery for unsaved work.
 func (a *App) autosave() {}
 
+// updateCheckSupported: the desktop checks GitHub for a newer version.
+const updateCheckSupported = true
+
 // systemFontsSupported: the desktop can read the installed fonts.
 const systemFontsSupported = true
 

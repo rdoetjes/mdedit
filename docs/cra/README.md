@@ -44,7 +44,7 @@ mdedit is under active development.
 
 ### Blocking the declaration (before 11 December 2027)
 
-- [ ] **B1. Security updates, desktop.** There is no update check or notification (Annex I Part I, 2(c)). Needed: at least a notification of a new version, and a decision on automatic updates with an opt-out.
+- [x] **B1. Security updates, desktop.** At start-up mdedit checks GitHub for a newer release and offers its page (Later postpones; Help menu turns it off; `ui/updates.go`). Installing stays manual: see the justification in the risk assessment, point 2(c). Optional: use the same check to show when support has ended (Article 13(19)).
 - [x] **B2. Secure distribution.** `.github/workflows/release.yml` builds every push to `main` into a tagged release with SHA256SUMS and GitHub build attestations (Sigstore signatures), verifiable with `gh attestation verify`. Check after the first run. **Keep releases for at least 10 years: don't delete them** (Article 13(9)). The macOS and Windows builds aren't signed with Apple or Microsoft certificates; users allow them once, after checking the download (release notes). The CRA doesn't require platform certificates.
 - [x] **B3. Scan Linux.** Done in CI for Linux, macOS and Windows on every release, and once by hand in Ubuntu 24.04. **FreeBSD:** `make security` there before each FreeBSD build.
 - [ ] **B4. Hostile-input testing.** Markdown, Hunspell and font parsing are untested against malicious input (fuzzing), and compound and rule matching have no time limit.

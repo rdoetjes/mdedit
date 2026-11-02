@@ -96,6 +96,9 @@ func (a *App) autosave() {
 	}
 }
 
+// updateCheckSupported: the browser version is updated by its site.
+const updateCheckSupported = false
+
 // systemFontsSupported: a web page can't read the installed fonts.
 const systemFontsSupported = false
 

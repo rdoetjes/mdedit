@@ -340,6 +340,10 @@ macOS (Apple Silicon) and Windows builds, the browser version, their SBOM and
 is signed by GitHub; check a download with
 `gh attestation verify FILE --repo rdoetjes/mdedit`. FreeBSD is built from source.
 
+At start-up the desktop version checks whether there is a newer release and, if so,
+offers to open its page; offline, it carries on as normal. Help → Check for Updates
+checks at any time, and Help → Don't Check for Updates at Start turns it off.
+
 mdedit isn't signed with an Apple or Microsoft certificate, so the first start asks
 for permission once. **macOS:** open the app, click Done, then System Settings →
 Privacy & Security → **Open Anyway**. **Windows:** More info → **Run anyway**.

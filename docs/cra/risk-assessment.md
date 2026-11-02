@@ -16,9 +16,11 @@ them); the integrity of the program and its updates; availability of unsaved wor
 script execution from documents.
 
 **Attack surface:** Markdown files, including anything pasted; images; dictionary files;
-installed fonts; links clicked by the user; three outgoing HTTPS connections
-(dictionaries from raw.githubusercontent.com at a pinned commit, YouTube stills, and
-the browser's own loading); the `mdedit-web` static server.
+installed fonts; links clicked by the user; outgoing HTTPS connections (the update check
+to api.github.com, dictionaries from raw.githubusercontent.com at a pinned commit,
+YouTube stills, and the browser's own loading); the `mdedit-web` static server. The
+update check only opens pages under the project's releases page, so a forged reply
+can't send users elsewhere.
 
 ## Risks
 
@@ -32,7 +34,7 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 | R4 | A local image is pulled into a PDF the user then shares | M | Image files only, shown in the preview first; documented for users | L | Accepted, documented |
 | R5 | A tampered dictionary | M | HTTPS, pinned commit, 64 MB limit; dictionaries are data, not code. Parsing as R3 | L | Done |
 | R6 | A tampered update or download | H | Releases built on GitHub with SHA256SUMS and signed build attestations; users can verify both | L | Done, check first release |
-| R7 | Users keep running a vulnerable version | H | Browser version updates with the site. **Desktop has no update notification** | H | Open, B1 |
+| R7 | Users keep running a vulnerable version | H | Browser version updates with the site. Desktop checks for a newer release at start-up and offers it; the user can postpone or turn the check off | L | Done |
 | R8 | Compromised or vulnerable dependency | M | `go.sum` hashes; few dependencies; SBOM; Gio copy in the repository, which needs manual follow-up | L | Done, keep watching |
 | R9 | Access to local documents by other users or programs | L | Plain files under the user's account; recovery files 0600 in a 0700 folder; the operating system protects them; no encryption | L | Accepted, documented |
 | R10 | Path traversal or disclosure through `mdedit-web` | M | Cleaned paths, GET and HEAD only, regular files only, runs as an unprivileged user, serves one folder of public files, `nosniff` | L | Done |
@@ -45,10 +47,10 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 
 | Point | Requirement | Assessment | Status |
 |---|---|---|---|
-| (1) | Appropriate level of cybersecurity based on the risks | Follows from the table above | Open until R3 and R7 close |
+| (1) | Appropriate level of cybersecurity based on the risks | Follows from the table above | Open until R3 closes |
 | 2(a) | No known exploitable vulnerabilities | No findings on Linux, macOS, Windows and browser; scanned on every release, which a finding stops. FreeBSD by hand | Met |
 | 2(b) | Secure by default, reset possible | No open ports on desktop, no accounts, network only on request; reset by deleting the settings folder | Met |
-| 2(c) | Security updates, automatic by default where applicable, notification, postponing | Browser: yes, by the site. Desktop: none | **Not met, B1** |
+| 2(c) | Security updates, automatic by default where applicable, notification, postponing | Browser: automatic, by the site. Desktop: notification at start-up, on by default; Later postpones; can be turned off. No automatic installation: mdedit is installed by the user into folders it may not own (applications folder, package managers), and a program replacing itself would need code signing to be safe; the user installs the update from the signed release | Met, by decision |
 | 2(d) | Protection from unauthorised access | No accounts or remote access in the program; files protected by the operating system. Static server holds public files only | Met for this use |
 | 2(e) | Confidentiality of data | HTTPS for all traffic; data at rest not encrypted, left to the disk encryption of the platform, as for any plain-text editor; documented | Met, by decision |
 | 2(f) | Integrity of data and programs | Plain files by design; failed saves are reported. Releases signed with build attestations | Met |

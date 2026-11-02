@@ -19,7 +19,8 @@ FreeBSD, macOS and Windows, and a browser version.
 Writing Markdown documents with a live preview, spelling checks and PDF export, by
 one person on their own computer, or in a browser for the same purpose. mdedit has no
 user accounts, stores nothing on a server, and has no telemetry. It only goes on the
-network when you ask for a dictionary, or when a document shows a YouTube still.
+network to check for updates at start-up, when you ask for a dictionary, or when a
+document shows a YouTube still.
 
 ## Known risks
 
@@ -49,7 +50,12 @@ Security updates are free until the end of the support period: see
 ## Updates
 
 - **Browser version:** updated by the site; reload the page.
-- **Desktop:** [FILL: after open item B1: how updates are notified and installed, and how to turn automatic updates off].
+- **Desktop:** at start-up mdedit asks GitHub whether there is a newer version. If so, a
+  dialog offers its release page; **Later** postpones it to the next start. Download and
+  check the new version as under Install, and replace the old one. Help → Check for
+  Updates checks at any time. Help → **Don't Check for Updates at Start** turns the check
+  off; it reveals your IP address to GitHub, nothing else. Without internet, the check
+  is skipped.
 
 ## Removing mdedit and your data
 

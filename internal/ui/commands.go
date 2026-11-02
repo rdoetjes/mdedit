@@ -98,6 +98,7 @@ type commands struct {
 	video                    *command
 	theme                    *command
 	spelling, outline        *command
+	updateCheck              *command
 	// The File menu's fixed items, above and below the recent files.
 	fileTop, fileBottom []*command
 }
@@ -139,6 +140,7 @@ func (a *App) buildSharedCommands() {
 	c.theme = newCommand("Dark Theme", "D", key.ModShift, a.cmdToggleTheme)
 	c.spelling = newCommand("Hide Spelling Errors", "", 0, a.cmdToggleSpelling)
 	c.outline = newCommand("Show Outline", "O", key.ModShift, a.cmdToggleOutline)
+	c.updateCheck = newCommand("Don't Check for Updates at Start", "", 0, a.cmdToggleUpdateCheck)
 	c.find = newCommand("Find…", "F", 0, a.cmdFind)
 	c.replace = newCommand("Replace…", "R", 0, a.cmdReplace)
 }
@@ -256,10 +258,11 @@ func (a *App) viewMenu() *menu {
 }
 
 func (a *App) helpMenu() *menu {
-	return &menu{title: "Help", items: []*command{
-		newCommand("Markdown Reference", "", 0, a.cmdMarkdownHelp),
-		newCommand("About mdedit", "", 0, a.cmdAbout),
-	}}
+	items := []*command{newCommand("Markdown Reference", "", 0, a.cmdMarkdownHelp)}
+	if updateCheckSupported {
+		items = append(items, nil, newCommand("Check for Updates", "", 0, a.cmdCheckUpdates), a.cmds.updateCheck, nil)
+	}
+	return &menu{title: "Help", items: append(items, newCommand("About mdedit", "", 0, a.cmdAbout))}
 }
 
 // contextItems returns the right-click menu: corrections for a misspelt
