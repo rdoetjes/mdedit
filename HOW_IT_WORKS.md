@@ -1844,7 +1844,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `platform_desktop.go`, `platform_js.go` | Everything that differs between desktop and browser: Open/Save/Export, settings storage, links, Quit, autosave, fonts (§9) |
 | `colors.go`, `theme.go` | The window's colours (`uiColors`: `lightColors`, `darkColors`, the current one in `col`); switching theme (`setDark`); `settings.json` |
 
-**Gio style used throughout:** no closures. A piece of UI is a named method
+**Gio style used throughout:** no layout closures. A piece of UI is a named method
 with the `layout.Widget` signature, and repeated rows are small types with a
 `layout` method:
 
@@ -2283,9 +2283,13 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
 
 Enforced by `internal/lint/style_test.go`, which runs with `make test`:
 
-- **No anonymous functions.** Use named functions, methods, and method
-  values (`a.followLink`, `headingLevel(2).apply`). For Gio, a widget is a
-  method with the signature `func(layout.Context) layout.Dimensions`.
+- **Closures only when short.** A closure may have at most 5 lines and no
+  closure inside it: something like `size += 0.5` for a button is fine, and
+  needs no test of its own. Anything with real logic (opening a file, say)
+  is a named function or method, which can be tested on its own. For Gio, a
+  widget is a method with the signature
+  `func(layout.Context) layout.Dimensions`; repeated rows are small types
+  with a `layout` method.
 - **At most 4 levels of indentation** on any line.
 - **At most 40 lines per function.** Split by responsibility; small types
   with methods replace closures that captured state.
