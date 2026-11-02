@@ -3,6 +3,8 @@
 A Markdown editor with a live, GitHub-styled preview and PDF export, written
 in Go with the [Gio](https://gioui.org) UI toolkit. Runs on Linux (X11 and Wayland), FreeBSD, macOS and Windows.
 
+You are allowed to use this for non-commercial use. For commercial use, please contact us.
+
 ![Screenshot](./screenshot.png)
 
 <!-- toc -->
@@ -323,3 +325,5 @@ The preview and the PDF share `internal/render`, so both use the same layout.
 See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for how the layers fit together, how
 input flows through the code, where to add features and where to look for
 bugs.
+
+© 2026 Phonax-Soft
