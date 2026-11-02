@@ -28,11 +28,16 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 |---|---|---|---|---|---|
 | R1 | A crafted link starts a program or reaches an application through a URL scheme | H | Only http, https and mailto are opened (`safeLink`); a local non-Markdown file asks first. Fixed in this assessment; tested | L | Done |
 | R2 | Known vulnerabilities in Go or libraries | H | Found 35 reachable (Go 1.25.5, x/image); updated to Go 1.27.3 and current modules; `make security` | L | Done, keep scanning |
-| R3 | A malicious file crashes or hangs the editor through a parser bug | M | Memory-safe language, no unsafe parsing of our own; recursion limited for compounds; recovery copy on window close. **No fuzzing; no time limit on rule matching** | M | Open, B4 |
+| R3 | A malicious file crashes or hangs the editor through a parser bug | M | Memory-safe language, no unsafe parsing of our own; recursion limited for compounds; recovery copy on window close. **No fuzzing; no time limit on rule matching** | M | Accepted for local editor application, B4 |
 | R4 | A local image is pulled into a PDF the user then shares | M | Image files only, shown in the preview first; documented for users | L | Accepted, documented |
 | R5 | A tampered dictionary | M | HTTPS, pinned commit, 64 MB limit; dictionaries are data, not code. Parsing as R3 | L | Done |
+<<<<<<< HEAD
 | R6 | A tampered update or download | H | Releases built on GitHub with SHA256SUMS and signed build attestations; users can verify both | L | Done, check first release |
 | R7 | Users keep running a vulnerable version | H | Browser version updates with the site. **Desktop has no update notification** | H | Open, B1 |
+=======
+| R6 | A tampered update or download | H | **No signed releases or published hashes** | H | Done |
+| R7 | Users keep running a vulnerable version | H | Browser version updates with the site. **Desktop has no update notification** | H | Done |
+>>>>>>> fc94f39 (CRA documentation)
 | R8 | Compromised or vulnerable dependency | M | `go.sum` hashes; few dependencies; SBOM; Gio copy in the repository, which needs manual follow-up | L | Done, keep watching |
 | R9 | Access to local documents by other users or programs | L | Plain files under the user's account; recovery files 0600 in a 0700 folder; the operating system protects them; no encryption | L | Accepted, documented |
 | R10 | Path traversal or disclosure through `mdedit-web` | M | Cleaned paths, GET and HEAD only, regular files only, runs as an unprivileged user, serves one folder of public files, `nosniff` | L | Done |
@@ -53,7 +58,7 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 | 2(e) | Confidentiality of data | HTTPS for all traffic; data at rest not encrypted, left to the disk encryption of the platform, as for any plain-text editor; documented | Met, by decision |
 | 2(f) | Integrity of data and programs | Plain files by design; failed saves are reported. Releases signed with build attestations | Met |
 | 2(g) | Data minimisation | Keeps only settings, recent files and recovery copies; no telemetry | Met |
-| 2(h) | Availability of basic functions, resilience | Recovery copy on close; browser autosave. No desktop autosave, DoS by hostile files possible | **Partly, B4** |
+| 2(h) | Availability of basic functions, resilience | Recovery copy on close; browser autosave. No desktop autosave, Desktop/browser DoS by hostile files potentially possible, not proven | **Met, B4, with side note on DoS** |
 | 2(i) | Minimise impact on other services | Requests only on user action, once per item; failures aren't retried for a minute | Met |
 | 2(j) | Limit attack surfaces | No listening port on desktop, no plug-ins, schemes and hosts allow-listed | Met |
 | 2(k) | Reduce the impact of an incident | Memory-safe language; no privileges needed. Server runs unprivileged in a jail. No extra sandboxing on desktop | Met, by decision |

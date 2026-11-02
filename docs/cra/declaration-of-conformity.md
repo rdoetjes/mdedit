@@ -17,9 +17,11 @@ Annex V of Regulation (EU) 2024/2847.
 
 Signed for and on behalf of: Phonax-Soft
 
-Place and date of issue: [FILL]
+Place and date of issue: Nieuwegein 2-11-2026
 
-Name, function, signature: [FILL: name], owner, [FILL: signature]
+Name, function, signature: Raymond Rene Doetjes, owner, 
+
+![Signature](./signature_eu_declaration_conformity.png)
 
 CE
 
