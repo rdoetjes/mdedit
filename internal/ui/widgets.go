@@ -9,11 +9,18 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+)
+
+// C and D are the usual short names in Gio code, for short closures.
+type (
+	C = layout.Context
+	D = layout.Dimensions
 )
 
 // button is a push button that can be used as a layout.Widget through its
@@ -54,6 +61,20 @@ func (b button) primaryStyle() material.ButtonStyle {
 // Flex children for fixed gaps.
 func vspace(dp unit.Dp) layout.FlexChild { return layout.Rigid(layout.Spacer{Height: dp}.Layout) }
 func hspace(dp unit.Dp) layout.FlexChild { return layout.Rigid(layout.Spacer{Width: dp}.Layout) }
+
+// hoverFill marks a button while the pointer is over it.
+func hoverFill(gtx C, click *widget.Clickable, size image.Point) {
+	if click.Hovered() {
+		fillRect(gtx, col.menuOpen, image.Rectangle{Max: size})
+	}
+}
+
+// centredIcon draws an icon of side pixels in the middle of a box of size.
+func centredIcon(gtx C, ic *widget.Icon, side int, size image.Point) {
+	gtx.Constraints = layout.Exact(image.Pt(side, side))
+	defer op.Offset(size.Sub(image.Pt(side, side)).Div(2)).Push(gtx.Ops).Pop()
+	ic.Layout(gtx, col.buttonFg)
+}
 
 // framed draws w inside a thin rounded border.
 func framed(gtx layout.Context, w layout.Widget) layout.Dimensions {

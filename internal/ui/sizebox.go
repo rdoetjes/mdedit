@@ -114,7 +114,7 @@ func (b *sizeBox) step(dir int) {
 	b.set(stepSize(b.a.textSize, dir))
 }
 
-func (b *sizeBox) handleInput(gtx layout.Context) {
+func (b *sizeBox) handleInput(gtx C) {
 	b.handleFocus(gtx)
 	if b.up.Clicked(gtx) {
 		b.step(1)
@@ -130,7 +130,7 @@ func (b *sizeBox) handleInput(gtx layout.Context) {
 
 // handleFocus selects the size when the field gets the focus, so typing
 // replaces it, and takes a typed size when it loses the focus.
-func (b *sizeBox) handleFocus(gtx layout.Context) {
+func (b *sizeBox) handleFocus(gtx C) {
 	focused := gtx.Focused(&b.field)
 	switch {
 	case focused && !b.focused:
@@ -143,7 +143,7 @@ func (b *sizeBox) handleFocus(gtx layout.Context) {
 
 // handleKeys steps with the arrow keys, before the field takes them, and
 // goes back to the current size on Escape.
-func (b *sizeBox) handleKeys(gtx layout.Context) {
+func (b *sizeBox) handleKeys(gtx C) {
 	for {
 		e, ok := b.a.editorKey(gtx,
 			key.Filter{Focus: &b.field, Name: key.NameUpArrow},
@@ -164,7 +164,7 @@ func (b *sizeBox) handleKeys(gtx layout.Context) {
 }
 
 // handleField takes the size on Enter and returns to the editor.
-func (b *sizeBox) handleField(gtx layout.Context) {
+func (b *sizeBox) handleField(gtx C) {
 	for {
 		ev, ok := b.field.Update(gtx)
 		if !ok {
@@ -177,28 +177,24 @@ func (b *sizeBox) handleField(gtx layout.Context) {
 	}
 }
 
-func (b *sizeBox) layout(gtx layout.Context) layout.Dimensions {
+func (b *sizeBox) layout(gtx C) D {
 	b.handleInput(gtx)
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(b.box),
+		layout.Rigid(func(gtx C) D { return framed(gtx, b.inside) }),
 		hspace(4),
-		layout.Rigid(b.unit),
+		layout.Rigid(b.caption),
 		hspace(12),
 	)
 }
 
-func (b *sizeBox) box(gtx layout.Context) layout.Dimensions {
-	return framed(gtx, b.inside)
-}
-
-func (b *sizeBox) inside(gtx layout.Context) layout.Dimensions {
+func (b *sizeBox) inside(gtx C) D {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(b.fieldView),
-		layout.Rigid(b.buttons),
+		layout.Rigid(b.arrows),
 	)
 }
 
-func (b *sizeBox) fieldView(gtx layout.Context) layout.Dimensions {
+func (b *sizeBox) fieldView(gtx C) D {
 	gtx.Constraints.Min.X = gtx.Dp(36)
 	gtx.Constraints.Max.X = gtx.Dp(36)
 	e := material.Editor(b.a.th, &b.field, "")
@@ -208,42 +204,25 @@ func (b *sizeBox) fieldView(gtx layout.Context) layout.Dimensions {
 	return dims
 }
 
-func (b *sizeBox) buttons(gtx layout.Context) layout.Dimensions {
+func (b *sizeBox) arrows(gtx C) D {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(stepButton{b: b, click: &b.up, icon: b.upIcon}.layout),
-		layout.Rigid(stepButton{b: b, click: &b.down, icon: b.downIcon}.layout),
+		layout.Rigid(func(gtx C) D { return b.up.Layout(gtx, b.arrow(&b.up, b.upIcon)) }),
+		layout.Rigid(func(gtx C) D { return b.down.Layout(gtx, b.arrow(&b.down, b.downIcon)) }),
 	)
 }
 
-func (b *sizeBox) unit(gtx layout.Context) layout.Dimensions {
+// arrow draws one of the small buttons, half the field's height.
+func (b *sizeBox) arrow(click *widget.Clickable, icon *widget.Icon) layout.Widget {
+	return func(gtx C) D {
+		size := image.Pt(gtx.Dp(18), b.h/2)
+		hoverFill(gtx, click, size)
+		centredIcon(gtx, icon, gtx.Dp(16), size)
+		return D{Size: size}
+	}
+}
+
+func (b *sizeBox) caption(gtx C) D {
 	l := material.Caption(b.a.th, "pt")
 	l.Color = col.statusFg
 	return l.Layout(gtx)
-}
-
-// stepButton is one of the small arrows, half the field's height.
-type stepButton struct {
-	b     *sizeBox
-	click *widget.Clickable
-	icon  *widget.Icon
-}
-
-func (s stepButton) layout(gtx layout.Context) layout.Dimensions {
-	return s.click.Layout(gtx, s.body)
-}
-
-func (s stepButton) body(gtx layout.Context) layout.Dimensions {
-	size := image.Pt(gtx.Dp(18), s.b.h/2)
-	if s.click.Hovered() {
-		fillRect(gtx, col.menuOpen, image.Rectangle{Max: size})
-	}
-	gtx.Constraints = layout.Exact(size)
-	layout.Center.Layout(gtx, s.glyph)
-	return layout.Dimensions{Size: size}
-}
-
-func (s stepButton) glyph(gtx layout.Context) layout.Dimensions {
-	side := gtx.Dp(16)
-	gtx.Constraints = layout.Exact(image.Pt(side, side))
-	return s.icon.Layout(gtx, col.buttonFg)
 }
