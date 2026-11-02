@@ -1,0 +1,124 @@
+# Every push to main is tested and scanned for known vulnerabilities on Linux
+# and macOS, and built for Linux and the browser. If all of that passes, it
+# becomes a release: tag v0.N.0 (one minor version up), with an SBOM, checksums and
+# GitHub build attestations, which sign each file: anyone can check that it was
+# built here from this commit with
+#   gh attestation verify FILE --repo rdoetjes/mdedit
+# This is the secure distribution of updates the Cyber Resilience Act asks for
+# (docs/cra). Only Linux and the browser version are published; macOS and
+# FreeBSD are built by hand.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One run at a time, so two quick pushes can't take the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - id: next
+        run: echo "version=$(./tools/nextversion.sh)" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: System libraries for Gio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config libwayland-dev libx11-dev libx11-xcb-dev \
+            libxkbcommon-x11-dev libgles2-mesa-dev libegl1-mesa-dev libffi-dev \
+            libxcursor-dev libxfixes-dev libvulkan-dev
+      - name: Test
+        run: make test
+      - name: Known vulnerabilities
+        run: make security
+      - name: Build
+        run: |
+          make build wasm VERSION="$VERSION"
+          mkdir -p pkg/mdedit dist
+          cp bin/mdedit pkg/mdedit/
+          ./tools/shipdocs.sh pkg/mdedit
+          tar -czf "dist/mdedit-$VERSION-linux-amd64.tar.gz" -C pkg mdedit
+          tar -czf "dist/mdedit-$VERSION-web.tar.gz" -C bin web
+      - name: Software bill of materials
+        run: go run ./tools/sbom -version "$VERSION" -o "dist/mdedit-$VERSION.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: dist/
+          if-no-files-found: error
+
+  # macOS isn't published: only tested and scanned, as it is delivered to
+  # clients directly (build it with make macos).
+  macos:
+    needs: version
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: make test
+      - name: Known vulnerabilities
+        run: make security
+
+  release:
+    needs: [version, linux, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write     # the tag and the release
+      id-token: write     # the attestations' signing identity
+      attestations: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum -- * > SHA256SUMS
+      - name: Sign the files (build provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Attest the SBOM to the programs
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: dist/*.tar.gz
+          sbom-path: dist/mdedit-${{ needs.version.outputs.version }}.cdx.json
+      - name: Release
+        run: |
+          gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "mdedit $VERSION" --generate-notes \
+            --notes "Verify a download: \`gh attestation verify FILE --repo $GITHUB_REPOSITORY\`, or compare it with SHA256SUMS."

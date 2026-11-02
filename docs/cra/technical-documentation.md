@@ -48,8 +48,9 @@ Documents are data: nothing in a document is executed. Links are handled by
 ### (b) Vulnerability handling
 
 [vulnerability-handling.md](vulnerability-handling.md), [SECURITY.md](../../SECURITY.md),
-SBOM in [sbom/](sbom/). **Contact address:** in SECURITY.md. **Secure distribution of
-updates:** browser version over HTTPS; desktop still open (B1, B2).
+SBOM in [sbom/](sbom/) and with each release. **Contact address:** in SECURITY.md.
+**Secure distribution of updates:** GitHub releases with checksums and signed build
+attestations; the browser version over HTTPS. Desktop update notification still open (B1).
 
 ### (c) Production and monitoring
 
@@ -57,7 +58,10 @@ Source in Git at <https://github.com/rdoetjes/mdedit>. Dependencies pinned in `g
 and verified through `go.sum`; Gio as a reviewed copy in `third_party/` with
 `gioui.org.patch`. Builds with `make`, from source, with a fixed toolchain in `go.mod`.
 Every change passes `make test`, including a code-style check. One person develops and
-reviews, with AI assistance; no independent review. No automated CI yet.
+reviews, with AI assistance; no independent review. Every push to `main` is tested,
+scanned and released by `.github/workflows/release.yml`; a failing test or a known
+vulnerability stops the release. Only Linux and the browser version are published;
+macOS builds for clients and FreeBSD builds are made by hand with `make`.
 
 ## 3. Risk assessment
 

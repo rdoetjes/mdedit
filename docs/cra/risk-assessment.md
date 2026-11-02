@@ -31,7 +31,7 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 | R3 | A malicious file crashes or hangs the editor through a parser bug | M | Memory-safe language, no unsafe parsing of our own; recursion limited for compounds; recovery copy on window close. **No fuzzing; no time limit on rule matching** | M | Open, B4 |
 | R4 | A local image is pulled into a PDF the user then shares | M | Image files only, shown in the preview first; documented for users | L | Accepted, documented |
 | R5 | A tampered dictionary | M | HTTPS, pinned commit, 64 MB limit; dictionaries are data, not code. Parsing as R3 | L | Done |
-| R6 | A tampered update or download | H | **No signed releases or published hashes** | H | Open, B2 |
+| R6 | A tampered update or download | H | Releases built on GitHub with SHA256SUMS and signed build attestations; users can verify both | L | Done, check first release |
 | R7 | Users keep running a vulnerable version | H | Browser version updates with the site. **Desktop has no update notification** | H | Open, B1 |
 | R8 | Compromised or vulnerable dependency | M | `go.sum` hashes; few dependencies; SBOM; Gio copy in the repository, which needs manual follow-up | L | Done, keep watching |
 | R9 | Access to local documents by other users or programs | L | Plain files under the user's account; recovery files 0600 in a 0700 folder; the operating system protects them; no encryption | L | Accepted, documented |
@@ -45,13 +45,13 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 
 | Point | Requirement | Assessment | Status |
 |---|---|---|---|
-| (1) | Appropriate level of cybersecurity based on the risks | Follows from the table above | Open until R3, R6, R7 close |
-| 2(a) | No known exploitable vulnerabilities | No findings on macOS, Windows and browser targets; Linux and FreeBSD GUI not scanned | **Partly, B3** |
+| (1) | Appropriate level of cybersecurity based on the risks | Follows from the table above | Open until R3 and R7 close |
+| 2(a) | No known exploitable vulnerabilities | No findings on Linux, macOS and browser; scanned on every release, which a finding stops. FreeBSD by hand | Met |
 | 2(b) | Secure by default, reset possible | No open ports on desktop, no accounts, network only on request; reset by deleting the settings folder | Met |
 | 2(c) | Security updates, automatic by default where applicable, notification, postponing | Browser: yes, by the site. Desktop: none | **Not met, B1** |
 | 2(d) | Protection from unauthorised access | No accounts or remote access in the program; files protected by the operating system. Static server holds public files only | Met for this use |
 | 2(e) | Confidentiality of data | HTTPS for all traffic; data at rest not encrypted, left to the disk encryption of the platform, as for any plain-text editor; documented | Met, by decision |
-| 2(f) | Integrity of data and programs | Plain files by design; failed saves are reported. Program integrity depends on B2 | **Partly, B2** |
+| 2(f) | Integrity of data and programs | Plain files by design; failed saves are reported. Releases signed with build attestations | Met |
 | 2(g) | Data minimisation | Keeps only settings, recent files and recovery copies; no telemetry | Met |
 | 2(h) | Availability of basic functions, resilience | Recovery copy on close; browser autosave. No desktop autosave, DoS by hostile files possible | **Partly, B4** |
 | 2(i) | Minimise impact on other services | Requests only on user action, once per item; failures aren't retried for a minute | Met |

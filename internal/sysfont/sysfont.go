@@ -82,7 +82,7 @@ func Scan() []Family {
 	for _, d := range dirs() {
 		filepath.WalkDir(d, s.visit) // a missing folder is simply skipped
 	}
-	var out []Family
+	out := []Family{} // empty, not nil: a scan found nothing
 	for name, cs := range s.byName {
 		if f, ok := pickStyles(name, cs); ok {
 			out = append(out, f)

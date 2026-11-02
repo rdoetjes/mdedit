@@ -19,6 +19,7 @@ Free for non-commercial use; commercial use needs a licence, see
   - [In the browser (WebAssembly)](#in-the-browser-webassembly)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
+  - [Releases](#releases)
   - [Security](#security)
   - [License](#license)
 
@@ -329,6 +330,16 @@ The preview and the PDF share `internal/render`, so both use the same layout.
 See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for how the layers fit together, how
 input flows through the code, where to add features and where to look for
 bugs.
+
+## Releases
+
+Every push to `main` that passes the tests and the vulnerability scan becomes a
+release on the [releases page](https://github.com/rdoetjes/mdedit/releases): the
+Linux build, the browser version, their SBOM and `SHA256SUMS`, with the version
+going up one minor step (0.1.0, 0.2.0, …). Each file is signed by GitHub; check a
+download with `gh attestation verify FILE --repo rdoetjes/mdedit`. macOS is tested
+and scanned on each push but not published; macOS and FreeBSD builds are made
+from source (`make macos`, `make`).
 
 ## Security
 

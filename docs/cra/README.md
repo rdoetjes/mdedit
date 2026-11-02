@@ -45,8 +45,8 @@ mdedit is under active development.
 ### Blocking the declaration (before 11 December 2027)
 
 - [ ] **B1. Security updates, desktop.** There is no update check or notification (Annex I Part I, 2(c)). Needed: at least a notification of a new version, and a decision on automatic updates with an opt-out.
-- [ ] **B2. Secure distribution.** No releases, tags, checksums or signatures; the macOS app is signed ad hoc only (Annex I Part II, 7). Needed: tagged releases with published hashes and signatures, and releases kept available for at least 10 years (Article 13(9)).
-- [ ] **B3. Scan Linux and FreeBSD.** `make security` on those machines; it can't be done from macOS for the GUI code.
+- [x] **B2. Secure distribution.** `.github/workflows/release.yml` builds every push to `main` into a tagged release with SHA256SUMS and GitHub build attestations (Sigstore signatures), verifiable with `gh attestation verify`. Only Linux and the browser version are published. Check after the first run. **Keep releases for at least 10 years: don't delete them** (Article 13(9)). **macOS builds delivered to clients** come from `make macos` and aren't covered: record each delivery (version, client, SHA-256 of the zip), and give the client the hash so they can check it.
+- [x] **B3. Scan Linux.** Done in CI for Linux and macOS on every release, and once by hand in Ubuntu 24.04. **FreeBSD:** `make security` there before each FreeBSD build.
 - [ ] **B4. Hostile-input testing.** Markdown, Hunspell and font parsing are untested against malicious input (fuzzing), and compound and rule matching have no time limit.
 - [ ] **B5. Data removal.** Removal is by hand, per the instructions. Decide whether that is "easy" enough, or add a menu item (Annex I Part I, 2(m)).
 - [ ] **B6. Support period.** Set and publish the end date (month and year): [support-period.md](support-period.md).
@@ -56,8 +56,8 @@ mdedit is under active development.
 
 ### Keep doing
 
-- [ ] `make security` at least monthly and before each release; update Go and modules.
-- [ ] Each release: `make sbom`, update the test report, keep the file for at least 10 years or the support period, whichever is longer (Article 13(13)).
+- [ ] `make security` at least monthly, also without releases (the workflow only scans on a push); update Go and modules.
+- [ ] Each release: the workflow publishes the SBOM with it. Keep this file and the releases for at least 10 years or the support period, whichever is longer (Article 13(13)).
 - [ ] Review the risk assessment on every substantial change (Article 13(3)).
 
 ## Sources checked
