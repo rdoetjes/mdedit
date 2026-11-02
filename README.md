@@ -124,6 +124,13 @@ and aren't listed) with Western accents, and a licence that allows embedding.
 A family without bold or italic uses its regular face for those. The browser
 version can't read installed fonts, so it keeps the built-in font.
 
+Next to it, the size box sets the base text size of the preview and the PDF,
+from 1 to 80 pt: click its arrows or use the arrow keys to go a whole size up
+or down, or type a size (10.5 and 10,5 both work) and press Enter. Everything
+scales with it, also code, maths and headings. The default is 10.5 pt; the
+preview follows in proportion, as its size on screen isn't in points. The
+browser version has this box too.
+
 The caret in the editor is a steady yellow block, with the character
 under it in red, so you see at a glance where you are.
 

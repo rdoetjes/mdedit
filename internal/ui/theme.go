@@ -19,6 +19,8 @@ type settings struct {
 	Languages  []string `json:"languages,omitempty"` // spelling languages; English if none
 	Outline    bool     `json:"outline,omitempty"`   // show the outline sidebar
 	Recent     []string `json:"recent,omitempty"`    // recently used files, newest first
+	// TextSize is the base text size in points; 0 for the default.
+	TextSize float32 `json:"textSize,omitempty"`
 	// Font is the document font; nil for the built-in one.
 	Font *sysfont.Family `json:"font,omitempty"`
 }

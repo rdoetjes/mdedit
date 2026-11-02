@@ -200,7 +200,7 @@ func (a *App) exportDialog() {
 
 func (a *App) exportInBackground(doc *mdmodel.Document, base, title string) {
 	var buf bytes.Buffer
-	err := pdfout.Write(&buf, doc, pdfout.Options{BaseDir: base, Title: title})
+	err := pdfout.Write(&buf, doc, pdfout.Options{BaseDir: base, Title: title, FontSize: a.textSize})
 	a.platform.mu.Lock()
 	a.platform.exporting = false
 	a.platform.mu.Unlock()

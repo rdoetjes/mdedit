@@ -46,21 +46,23 @@ func (a *App) toolbarItems(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 }
 
-// toolbarRest fills the toolbar after the buttons: the font box, lined up
-// with the preview, then the document's name.
+// toolbarRest fills the toolbar after the buttons: the boxes for the
+// document's font and size, lined up with the preview, then its name. The
+// browser can't use installed fonts, so it only has the size.
 func (a *App) toolbarRest(gtx layout.Context) layout.Dimensions {
-	if !systemFontsSupported || a.view == viewEditor {
+	if a.view == viewEditor {
 		a.fontBox.hide()
 		return a.fileName(gtx)
 	}
 	x := a.toolW - gtx.Dp(toolbarRight) - gtx.Constraints.Max.X
 	gap := max(a.previewLeft(gtx, a.toolW)+gtx.Dp(10)-x, gtx.Dp(8))
-	a.fontBox.x = x + gap
-	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(pixelGap(gap).layout),
-		layout.Rigid(a.fontBox.layout),
-		layout.Flexed(1, a.fileName),
-	)
+	children := []layout.FlexChild{layout.Rigid(pixelGap(gap).layout)}
+	if systemFontsSupported {
+		a.fontBox.x = x + gap
+		children = append(children, layout.Rigid(a.fontBox.layout))
+	}
+	children = append(children, layout.Rigid(a.sizeBox.layout), layout.Flexed(1, a.fileName))
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 }
 
 // pixelGap is an empty width, in pixels.

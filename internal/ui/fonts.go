@@ -34,6 +34,10 @@ func SavedFont() (sysfont.Set, error) {
 	return st.Font.Load()
 }
 
+// SavedTextSize is the text size chosen in the editor, for exporting a PDF
+// without a window.
+func SavedTextSize() float32 { return savedSize(loadSettings()) }
+
 // restoreFont applies the saved font at start-up. If its files are gone,
 // the Go font is used and the choice is kept, in case they come back.
 func (a *App) restoreFont(st settings) {

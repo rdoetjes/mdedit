@@ -35,6 +35,7 @@ type Preview struct {
 	cache  []*render.Layout
 	cacheW int
 	cacheE float32
+	scale  float32 // of the text, from the text size in the toolbar
 	clicks []gesture.Click
 	text   *textPainter
 	images map[string]*imageEntry
@@ -49,6 +50,7 @@ type Preview struct {
 
 func NewPreview(shaper *text.Shaper) *Preview {
 	p := &Preview{
+		scale:  1,
 		text:   newTextPainter(shaper),
 		images: map[string]*imageEntry{},
 	}
@@ -83,6 +85,9 @@ func (p *Preview) setFont(s *text.Shaper, typeface string) {
 		p.cache = make([]*render.Layout, len(p.doc.Blocks))
 	}
 }
+
+// setScale sizes the text; a changed size lays everything out again.
+func (p *Preview) setScale(s float32) { p.scale = s }
 
 // ScrollToBlock scrolls so block i is at the top.
 func (p *Preview) ScrollToBlock(i int) {
@@ -122,7 +127,7 @@ func (p *Preview) measure(gtx layout.Context) {
 	// Leave room for the scrollbar.
 	p.contentW = max(min(p.width-2*p.pad-gtx.Dp(10), gtx.Dp(maxContentWidth)), gtx.Dp(100))
 	p.ox = float32((p.width - p.contentW) / 2)
-	em := float32(gtx.Sp(16))
+	em := float32(gtx.Sp(16)) * p.scale
 	if p.contentW != p.cacheW || em != p.cacheE || p.imagesChanged.Swap(false) {
 		p.cache = make([]*render.Layout, len(p.doc.Blocks))
 		p.cacheW, p.cacheE = p.contentW, em

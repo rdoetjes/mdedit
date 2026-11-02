@@ -12,6 +12,9 @@ import (
 	"mdedit/internal/sysfont"
 )
 
+// DefaultFontSize is the base font size in points.
+const DefaultFontSize = 10.5
+
 // Options control the page setup.
 type Options struct {
 	PageSize string  // "A4" or "Letter"
@@ -27,7 +30,7 @@ func (o *Options) defaults() {
 		o.PageSize = "A4"
 	}
 	if o.FontSize == 0 {
-		o.FontSize = 10.5
+		o.FontSize = DefaultFontSize
 	}
 	if o.Margin == 0 {
 		o.Margin = 56

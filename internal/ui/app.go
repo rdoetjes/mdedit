@@ -80,7 +80,9 @@ type App struct {
 	// fontArrival.
 	bodyFont    sysfont.Set
 	fontBox     fontCombo
-	toolW       int // the toolbar's width
+	sizeBox     sizeBox
+	textSize    float32 // base text size of the document, in points
+	toolW       int     // the toolbar's width
 	families    []sysfont.Family
 	fontArrival chan []sysfont.Family
 	// runes is the text as of the last reparse, and lines the rune offset
@@ -138,6 +140,7 @@ func New(path string) (*App, error) {
 	a.recent = st.Recent
 	a.restoreFont(st)
 	a.fontBox.init(a)
+	a.sizeBox.init(a, st)
 	if err := a.loadInitial(path); err != nil {
 		return nil, err
 	}

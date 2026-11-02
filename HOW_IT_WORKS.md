@@ -1833,6 +1833,7 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `spelling.go` | Wavy underlines under misspelt words, their right-click corrections, Add to Dictionary, Hide Spelling Errors |
 | `languages.go`, `langdialog.go` | The chosen spelling languages: loading and downloading dictionaries in the background, the Spelling Languages dialog |
 | `fonts.go`, `fontcombo.go` | The document font: restoring it, applying it to the preview and PDF, the background font scan, the PDF font combo box, which `toolbarRest` places in the toolbar in line with the preview (`previewLeft`); its list is drawn with `op.Defer`, over the rest of the window |
+| `sizebox.go` | The text size box in the toolbar: the base size of the PDF in points (`pdfout.Options.FontSize`), which the preview follows in proportion (`Preview.setScale`); a typed size counts on Enter or leaving the field, not at each digit |
 | `caret.go` | The editor's block caret: a yellow box over the character at the caret, drawn in red; it doesn't blink and shows while the editor has the focus; Gio's thin caret is switched off (`Editor.HideCaret`, a patch in `third_party`) |
 | `sourcepos.go` | Clicking in the preview moves the editor's caret to the clicked word in the source (`Preview.sourceClick` describes the click as "the nth occurrence of this word in the block"; `sourceOffset` finds that occurrence in the block's source lines; §7) |
 | `recent.go` | The last five files opened or saved, as entries in the File menu (desktop only: `recentFilesSupported`) |

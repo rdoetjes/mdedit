@@ -113,3 +113,15 @@ func TestGoFontMetrics(t *testing.T) {
 		}
 	}
 }
+
+// The size range of the toolbar must export, also at its limits.
+func TestExtremeSizes(t *testing.T) {
+	doc := mdmodel.Parse([]byte("# Title\n\nText with a_very_long_word_that_cannot_wrap_anywhere_on_the_line.\n\n" +
+		"| a | b |\n|---|---|\n| 1 | 2 |\n\n```\ncode\n```\n\n$$x^2$$\n"))
+	for _, size := range []float32{1, 80} {
+		var buf bytes.Buffer
+		if err := Write(&buf, doc, Options{FontSize: size}); err != nil || buf.Len() == 0 {
+			t.Errorf("size %v: %v", size, err)
+		}
+	}
+}

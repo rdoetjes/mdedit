@@ -95,7 +95,7 @@ func exportPDF(in, out string) error {
 	if ferr != nil {
 		fmt.Fprintln(os.Stderr, "mdedit: using the built-in font:", ferr)
 	}
-	err = pdfout.Write(f, mdmodel.Parse(src), pdfout.Options{BaseDir: filepath.Dir(in), Title: base, Font: font})
+	err = pdfout.Write(f, mdmodel.Parse(src), pdfout.Options{BaseDir: filepath.Dir(in), Title: base, Font: font, FontSize: ui.SavedTextSize()})
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}

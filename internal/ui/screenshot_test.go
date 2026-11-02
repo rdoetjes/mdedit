@@ -196,6 +196,9 @@ func (s *shooter) fontScenes() {
 	}
 	a.fontBox.choose(name)
 	s.scene("font.png", fontSample)
+	a.sizeBox.set(16)
+	s.shot("font-size.png")
+	a.sizeBox.set(10.5)
 	a.fontBox.choose(defaultFontName)
 }
 
