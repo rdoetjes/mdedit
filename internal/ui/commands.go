@@ -245,9 +245,9 @@ func (a *App) insertMenu() *menu {
 
 func (a *App) viewMenu() *menu {
 	items := []*command{
-		newCommand("Editor and Preview", "", 0, viewChoice{a, viewSplit}.run),
-		newCommand("Editor Only", "", 0, viewChoice{a, viewEditor}.run),
-		newCommand("Preview Only", "", 0, viewChoice{a, viewPreview}.run),
+		a.viewCommand("Editor and Preview", viewSplit),
+		a.viewCommand("Editor Only", viewEditor),
+		a.viewCommand("Preview Only", viewPreview),
 		nil,
 		a.cmds.outline,
 		a.cmds.theme,
@@ -359,10 +359,7 @@ func (a *App) about() {
 
 func (a *App) closeDialog(int) { a.dialog = nil }
 
-// viewChoice switches to a view mode.
-type viewChoice struct {
-	a *App
-	v viewMode
+// viewCommand switches to a view mode.
+func (a *App) viewCommand(label string, v viewMode) *command {
+	return newCommand(label, "", 0, func(C) { a.view = v })
 }
-
-func (c viewChoice) run(layout.Context) { c.a.view = c.v }

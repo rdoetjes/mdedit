@@ -107,11 +107,7 @@ func (d *LanguageDialog) caption(text string) layout.Widget {
 func (d *LanguageDialog) languageList(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Max.Y = min(gtx.Constraints.Max.Y, gtx.Dp(340))
 	gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
-	return framed(gtx, d.listInside)
-}
-
-func (d *LanguageDialog) listInside(gtx layout.Context) layout.Dimensions {
-	return layout.UniformInset(4).Layout(gtx, d.listView)
+	return framed(gtx, func(gtx C) D { return layout.UniformInset(4).Layout(gtx, d.listView) })
 }
 
 func (d *LanguageDialog) listView(gtx layout.Context) layout.Dimensions {

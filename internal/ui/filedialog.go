@@ -281,7 +281,7 @@ func (d *FileDialog) card(gtx layout.Context) layout.Dimensions {
 
 func (d *FileDialog) content(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(d.title),
+		layout.Rigid(material.H6(d.th, d.Title).Layout),
 		vspace(8),
 		layout.Rigid(d.pathBar),
 		vspace(8),
@@ -290,10 +290,6 @@ func (d *FileDialog) content(gtx layout.Context) layout.Dimensions {
 		layout.Rigid(d.errorLine),
 		layout.Rigid(d.nameBar),
 	)
-}
-
-func (d *FileDialog) title(gtx layout.Context) layout.Dimensions {
-	return material.H6(d.th, d.Title).Layout(gtx)
 }
 
 func (d *FileDialog) pathBar(gtx layout.Context) layout.Dimensions {
@@ -311,17 +307,32 @@ func (d *FileDialog) dirLabel(gtx layout.Context) layout.Dimensions {
 	return l.Layout(gtx)
 }
 
-func (d *FileDialog) fileList(gtx layout.Context) layout.Dimensions {
-	return framed(gtx, d.listView)
+func (d *FileDialog) fileList(gtx C) D {
+	return framed(gtx, func(gtx C) D {
+		gtx.Constraints.Min = gtx.Constraints.Max
+		return material.List(d.th, &d.list).Layout(gtx, len(d.entries), d.entry)
+	})
 }
 
-func (d *FileDialog) listView(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min = gtx.Constraints.Max
-	return material.List(d.th, &d.list).Layout(gtx, len(d.entries), d.entry)
+func (d *FileDialog) entry(gtx C, i int) D {
+	return d.clicks[i].Layout(gtx, func(gtx C) D { return d.row(gtx, i) })
 }
 
-func (d *FileDialog) entry(gtx layout.Context, i int) layout.Dimensions {
-	return d.clicks[i].Layout(gtx, fileRow{d: d, i: i}.layout)
+// row draws one entry of the file list.
+func (d *FileDialog) row(gtx C, i int) D {
+	e := d.entries[i]
+	folder := isDir(d.dir, e)
+	if d.clicks[i].Hovered() || (!folder && e.Name() == d.name.Text()) {
+		fillRect(gtx, col.highlightBg, image.Rect(0, 0, gtx.Constraints.Max.X, gtx.Dp(28)))
+	}
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
+	l := material.Body1(d.th, e.Name())
+	if folder {
+		l.Text += "/"
+		l.Font.Weight = font.Bold
+	}
+	l.MaxLines = 1
+	return layout.Inset{Left: 8, Right: 8, Top: 4, Bottom: 4}.Layout(gtx, l.Layout)
 }
 
 func (d *FileDialog) errorLine(gtx layout.Context) layout.Dimensions {
@@ -341,48 +352,10 @@ func (d *FileDialog) nameBar(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(material.Body1(d.th, "Name:").Layout),
 		hspace(8),
-		layout.Flexed(1, d.nameField),
+		layout.Flexed(1, field(d.th, &d.name, "file name or path")),
 		hspace(8),
 		layout.Rigid(button{th: d.th, click: &d.cancel, label: "Cancel"}.layout),
 		hspace(8),
 		layout.Rigid(button{th: d.th, click: &d.ok, label: label, primary: true}.layout),
 	)
-}
-
-func (d *FileDialog) nameField(gtx layout.Context) layout.Dimensions {
-	return framed(gtx, d.nameEditor)
-}
-
-func (d *FileDialog) nameEditor(gtx layout.Context) layout.Dimensions {
-	return layout.UniformInset(6).Layout(gtx, material.Editor(d.th, &d.name, "file name or path").Layout)
-}
-
-// fileRow draws one entry of the file list.
-type fileRow struct {
-	d *FileDialog
-	i int
-}
-
-func (r fileRow) layout(gtx layout.Context) layout.Dimensions {
-	if r.highlighted() {
-		fillRect(gtx, col.highlightBg, image.Rect(0, 0, gtx.Constraints.Max.X, gtx.Dp(28)))
-	}
-	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.Inset{Left: 8, Right: 8, Top: 4, Bottom: 4}.Layout(gtx, r.label)
-}
-
-func (r fileRow) highlighted() bool {
-	e := r.d.entries[r.i]
-	return r.d.clicks[r.i].Hovered() || (!isDir(r.d.dir, e) && e.Name() == r.d.name.Text())
-}
-
-func (r fileRow) label(gtx layout.Context) layout.Dimensions {
-	e := r.d.entries[r.i]
-	l := material.Body1(r.d.th, e.Name())
-	if isDir(r.d.dir, e) {
-		l.Text += "/"
-		l.Font.Weight = font.Bold
-	}
-	l.MaxLines = 1
-	return l.Layout(gtx)
 }

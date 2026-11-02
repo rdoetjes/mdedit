@@ -154,42 +154,21 @@ func (o *outline) body(gtx layout.Context) layout.Dimensions {
 	return material.List(o.a.th, &o.list).Layout(gtx, len(o.items), o.row)
 }
 
-func (o *outline) row(gtx layout.Context, i int) layout.Dimensions {
-	return o.clicks[i].Layout(gtx, outlineRow{o: o, i: i}.layout)
-}
-
-// outlineRow is one heading in the sidebar.
-type outlineRow struct {
-	o *outline
-	i int
-}
-
-func (r outlineRow) layout(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.Background{}.Layout(gtx, r.background, r.label)
-}
-
-func (r outlineRow) background(gtx layout.Context) layout.Dimensions {
-	switch {
-	case r.i == r.o.current:
-		fillRect(gtx, col.highlightBg, image.Rectangle{Max: gtx.Constraints.Min})
-	case r.o.clicks[r.i].Hovered():
-		fillRect(gtx, col.menuHover, image.Rectangle{Max: gtx.Constraints.Min})
-	}
-	return layout.Dimensions{Size: gtx.Constraints.Min}
-}
-
-// label indents the heading by its level; top-level headings are bold.
-func (r outlineRow) label(gtx layout.Context) layout.Dimensions {
-	it := r.o.items[r.i]
+// row is one heading, indented by its level; top-level headings are bold.
+func (o *outline) row(gtx C, i int) D {
+	it := o.items[i]
 	indent := unit.Dp(14 + 12*(min(it.level, 6)-1))
-	l := material.Body2(r.o.a.th, it.text)
-	l.Color = col.buttonFg
-	l.MaxLines = 1
+	l := material.Body2(o.a.th, it.text)
+	l.Color, l.MaxLines = col.buttonFg, 1
 	if it.level == 1 {
 		l.Font.Weight = font.SemiBold
 	}
-	return layout.Inset{Top: 5, Bottom: 5, Left: indent, Right: 10}.Layout(gtx, l.Layout)
+	gtx.Constraints.Min.X = gtx.Constraints.Max.X
+	label := func(gtx C) D { return layout.Inset{Top: 5, Bottom: 5, Left: indent, Right: 10}.Layout(gtx, l.Layout) }
+	background := rowBackground(i == o.current, &o.clicks[i])
+	return o.clicks[i].Layout(gtx, func(gtx C) D {
+		return layout.Background{}.Layout(gtx, background, label)
+	})
 }
 
 // cmdToggleOutline shows or hides the sidebar and remembers the choice.

@@ -349,17 +349,8 @@ func (c *fontCombo) message(gtx C, s string) D {
 func (c *fontCombo) entry(gtx C, i int) D {
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	return c.clicks[i].Layout(gtx, func(gtx C) D {
-		return layout.Background{}.Layout(gtx, c.entryBackground(i), c.entryLabel(i))
+		return layout.Background{}.Layout(gtx, rowBackground(i == c.hot, &c.clicks[i]), c.entryLabel(i))
 	})
-}
-
-func (c *fontCombo) entryBackground(i int) layout.Widget {
-	return func(gtx C) D {
-		if i == c.hot || c.clicks[i].Hovered() {
-			fillRect(gtx, col.highlightBg, image.Rectangle{Max: gtx.Constraints.Min})
-		}
-		return D{Size: gtx.Constraints.Min}
-	}
 }
 
 func (c *fontCombo) entryLabel(i int) layout.Widget {

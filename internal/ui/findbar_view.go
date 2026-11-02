@@ -30,7 +30,7 @@ func (f *findBar) rowStack(gtx layout.Context) layout.Dimensions {
 
 func (f *findBar) searchRow(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Flexed(1, field{th: f.th, ed: &f.query, hint: "Find"}.layout),
+		layout.Flexed(1, field(f.th, &f.query, "Find")),
 		hspace(8),
 		layout.Rigid(material.CheckBox(f.th, &f.matchCase, "Match case").Layout),
 		hspace(8),
@@ -44,7 +44,7 @@ func (f *findBar) searchRow(gtx layout.Context) layout.Dimensions {
 
 func (f *findBar) replaceRow(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Flexed(1, field{th: f.th, ed: &f.repl, hint: "Replace with"}.layout),
+		layout.Flexed(1, field(f.th, &f.repl, "Replace with")),
 		hspace(8),
 		layout.Rigid(button{th: f.th, click: &f.replOne, label: "Replace"}.layout),
 		hspace(6),
@@ -98,17 +98,10 @@ func (f *findBar) highlightRange(gtx layout.Context, start, end int, bg color.NR
 }
 
 // field is a framed single-line text field with a hint.
-type field struct {
-	th   *material.Theme
-	ed   *widget.Editor
-	hint string
-}
-
-func (fl field) layout(gtx layout.Context) layout.Dimensions {
-	return framed(gtx, fl.inner)
-}
-
-func (fl field) inner(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min.X = gtx.Constraints.Max.X
-	return layout.UniformInset(6).Layout(gtx, material.Editor(fl.th, fl.ed, fl.hint).Layout)
+func field(th *material.Theme, ed *widget.Editor, hint string) layout.Widget {
+	inner := func(gtx C) D {
+		gtx.Constraints.Min.X = gtx.Constraints.Max.X
+		return layout.UniformInset(6).Layout(gtx, material.Editor(th, ed, hint).Layout)
+	}
+	return func(gtx C) D { return framed(gtx, inner) }
 }

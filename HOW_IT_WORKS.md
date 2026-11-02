@@ -316,14 +316,14 @@ finishes) is stored in a field and done on the next frame: see
 ## 4. Walkthrough: clicking Format → Bold
 
 1. **Frame N — the bar is drawn.** `ui/window.go: menuBarRow` →
-   `ui/menubar.go: menuBar.Layout` → each title is `menuTitle.layout`, which
+   `ui/menubar.go: menuBar.Layout` → each title is `menuBar.title`, which
    wraps the label in `t.m.titles[t.i].Layout(gtx, t.body)` — a
    `widget.Clickable`.
 2. **Click "Format" → frame N+1.** `menuBar.handleClicks` sees
    `m.titles[i].Clicked(gtx)` and sets `m.open`. Later in the frame,
    `ui/window.go: layoutOverlay` → `menuBar.Overlay` → `ui/popup.go:
    popup.Layout` draws the items, each wrapped in its own `Clickable`
-   (`popupRow.layout`).
+   (`popup.row`).
 3. **Click "Bold" → frame N+2.** `popup.Layout` → `handleInput` →
    `clickedItem` returns the `*command`; `menuBar.Overlay` closes the menu
    and calls `chosen.run(gtx)`.
@@ -333,7 +333,7 @@ finishes) is stored in a field and done on the next frame: see
    c.bold = a.editCommand("Bold", "B", 0, inlineMarker(edit.Bold).apply)
    ```
 
-   `ui/edits.go: editCommand` makes `run = editAction{a, f}.run`, which calls
+   `ui/edits.go: editCommand` makes `run` a closure, which calls
    `applyEdit`:
 
    ```go
@@ -1844,22 +1844,21 @@ browser side is missing. Then try it with `make wasm && make serve`.
 | `platform_desktop.go`, `platform_js.go` | Everything that differs between desktop and browser: Open/Save/Export, settings storage, links, Quit, autosave, fonts (§9) |
 | `colors.go`, `theme.go` | The window's colours (`uiColors`: `lightColors`, `darkColors`, the current one in `col`); switching theme (`setDark`); `settings.json` |
 
-**Gio style used throughout:** no layout closures. A piece of UI is a named method
-with the `layout.Widget` signature, and repeated rows are small types with a
-`layout` method:
+**Gio style used throughout:** a piece of UI is a named method with the
+`layout.Widget` signature, not a nest of layout closures. Short closures
+carry a value into such a method, and a function can return a widget for its
+arguments. `C` and `D` are short for `layout.Context` and `layout.Dimensions`
+(`widgets.go`):
 
 ```go
 // ui/toolbar.go
-type toolbarButton struct {
-    a *App
-    c *command
-}
-
-func (b toolbarButton) layout(gtx layout.Context) layout.Dimensions {
-    if b.c.click.Hovered() {
-        b.a.hint = b.c.tooltip()
+func (a *App) toolbarButton(c *command) layout.Widget {
+    return func(gtx C) D {
+        if c.click.Hovered() {
+            a.hint = c.tooltip()
+        }
+        return layout.Inset{Right: 2}.Layout(gtx, iconButton{click: &c.click, icon: c.icon}.layout)
     }
-    return layout.Inset{Right: 2}.Layout(gtx, iconButton{click: &b.c.click, icon: b.c.icon}.layout)
 }
 ```
 

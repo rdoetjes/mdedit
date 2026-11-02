@@ -7,7 +7,6 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
-	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 )
@@ -39,7 +38,7 @@ func (a *App) toolbarItems(gtx layout.Context) layout.Dimensions {
 		if c == nil {
 			children = append(children, layout.Rigid(toolbarSeparator))
 		} else {
-			children = append(children, layout.Rigid(toolbarButton{a: a, c: c}.layout))
+			children = append(children, layout.Rigid(a.toolbarButton(c)))
 		}
 	}
 	children = append(children, layout.Flexed(1, a.toolbarRest))
@@ -56,7 +55,7 @@ func (a *App) toolbarRest(gtx layout.Context) layout.Dimensions {
 	}
 	x := a.toolW - gtx.Dp(toolbarRight) - gtx.Constraints.Max.X
 	gap := max(a.previewLeft(gtx, a.toolW)+gtx.Dp(10)-x, gtx.Dp(8))
-	children := []layout.FlexChild{layout.Rigid(pixelGap(gap).layout)}
+	children := []layout.FlexChild{layout.Rigid(func(C) D { return D{Size: image.Pt(gap, 0)} })}
 	if systemFontsSupported {
 		a.fontBox.x = x + gap
 		children = append(children, layout.Rigid(a.fontBox.layout))
@@ -65,17 +64,10 @@ func (a *App) toolbarRest(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 }
 
-// pixelGap is an empty width, in pixels.
-type pixelGap int
-
-func (g pixelGap) layout(layout.Context) layout.Dimensions {
-	return layout.Dimensions{Size: image.Pt(int(g), 0)}
-}
-
-func toolbarSeparator(gtx layout.Context) layout.Dimensions {
+func toolbarSeparator(gtx C) D {
 	w, h := gtx.Dp(17), gtx.Dp(30)
 	fillRect(gtx, col.dividerCol, image.Rect(w/2, gtx.Dp(5), w/2+1, h-gtx.Dp(5)))
-	return layout.Dimensions{Size: image.Pt(w, h)}
+	return D{Size: image.Pt(w, h)}
 }
 
 // documentName is the path of the document, or just its file name if the
@@ -109,16 +101,13 @@ func (a *App) fileName(gtx layout.Context) layout.Dimensions {
 
 // toolbarButton is a command's icon button; hovering it shows the command
 // in the status bar.
-type toolbarButton struct {
-	a *App
-	c *command
-}
-
-func (b toolbarButton) layout(gtx layout.Context) layout.Dimensions {
-	if b.c.click.Hovered() {
-		b.a.hint = b.c.tooltip()
+func (a *App) toolbarButton(c *command) layout.Widget {
+	return func(gtx C) D {
+		if c.click.Hovered() {
+			a.hint = c.tooltip()
+		}
+		return layout.Inset{Right: 2}.Layout(gtx, iconButton{click: &c.click, icon: c.icon}.layout)
 	}
-	return layout.Inset{Right: 2}.Layout(gtx, iconButton{click: &b.c.click, icon: b.c.icon}.layout)
 }
 
 // iconButton is a flat button showing an icon.
@@ -127,27 +116,22 @@ type iconButton struct {
 	icon  *widget.Icon
 }
 
-func (b iconButton) layout(gtx layout.Context) layout.Dimensions {
-	return b.click.Layout(gtx, b.body)
+func (b iconButton) layout(gtx C) D {
+	return b.click.Layout(gtx, func(gtx C) D {
+		return layout.Background{}.Layout(gtx, b.background, b.padded)
+	})
 }
 
-func (b iconButton) body(gtx layout.Context) layout.Dimensions {
-	return layout.Background{}.Layout(gtx, b.background, b.padded)
-}
-
-func (b iconButton) background(gtx layout.Context) layout.Dimensions {
+func (b iconButton) background(gtx C) D {
 	if b.click.Hovered() {
 		fillRoundRect(gtx, col.menuOpen, image.Rectangle{Max: gtx.Constraints.Min}, gtx.Dp(4))
 	}
-	return layout.Dimensions{Size: gtx.Constraints.Min}
+	return D{Size: gtx.Constraints.Min}
 }
 
-func (b iconButton) padded(gtx layout.Context) layout.Dimensions {
-	return layout.UniformInset(5).Layout(gtx, b.glyph)
-}
-
-func (b iconButton) glyph(gtx layout.Context) layout.Dimensions {
-	sz := gtx.Dp(unit.Dp(20))
-	gtx.Constraints = layout.Exact(image.Pt(sz, sz))
-	return b.icon.Layout(gtx, col.buttonFg)
+func (b iconButton) padded(gtx C) D {
+	return layout.UniformInset(5).Layout(gtx, func(gtx C) D {
+		gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(20), gtx.Dp(20)))
+		return b.icon.Layout(gtx, col.buttonFg)
+	})
 }

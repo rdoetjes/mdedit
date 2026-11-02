@@ -112,7 +112,7 @@ func (p *popup) recordItems(gtx layout.Context) (op.CallOp, image.Point) {
 func (p *popup) itemList(gtx layout.Context) layout.Dimensions {
 	children := make([]layout.FlexChild, len(p.items))
 	for i := range p.items {
-		children[i] = layout.Rigid(popupRow{p: p, i: i}.layout)
+		children[i] = layout.Rigid(func(gtx C) D { return p.row(gtx, i) })
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 }
@@ -144,73 +144,45 @@ func measureLabel(gtx layout.Context, th *material.Theme, s string) int {
 	return material.Body2(th, s).Layout(gtx).Size.X
 }
 
-// popupRow is one item (or separator) of a popup.
-type popupRow struct {
-	p *popup
-	i int
-}
-
-func (r popupRow) layout(gtx layout.Context) layout.Dimensions {
-	if r.p.items[r.i] == nil {
-		return r.separator(gtx)
+// row is one item or separator.
+func (p *popup) row(gtx C, i int) D {
+	c := p.items[i]
+	if c == nil {
+		h := gtx.Dp(9)
+		fillRect(gtx, col.dividerCol, image.Rect(0, h/2, p.width, h/2+1))
+		return D{Size: image.Pt(p.width, h)}
 	}
-	return r.p.clicks[r.i].Layout(gtx, r.item)
+	background := rowBackground(false, &p.clicks[i])
+	content := func(gtx C) D { return p.itemContent(gtx, c) }
+	return p.clicks[i].Layout(gtx, func(gtx C) D {
+		gtx.Constraints.Min.X, gtx.Constraints.Max.X = p.width, p.width
+		return layout.Background{}.Layout(gtx, background, content)
+	})
 }
 
-func (r popupRow) separator(gtx layout.Context) layout.Dimensions {
-	h := gtx.Dp(9)
-	fillRect(gtx, col.dividerCol, image.Rect(0, h/2, r.p.width, h/2+1))
-	return layout.Dimensions{Size: image.Pt(r.p.width, h)}
-}
-
-func (r popupRow) item(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min.X = r.p.width
-	gtx.Constraints.Max.X = r.p.width
-	return layout.Background{}.Layout(gtx, r.background, r.content)
-}
-
-func (r popupRow) background(gtx layout.Context) layout.Dimensions {
-	if r.p.clicks[r.i].Hovered() {
-		fillRect(gtx, col.menuHover, image.Rectangle{Max: gtx.Constraints.Min})
+// itemContent is an item's icon, label and shortcut.
+func (p *popup) itemContent(gtx C, c *command) D {
+	label := material.Body2(p.th, c.label)
+	label.Color = col.buttonFg
+	keys := material.Body2(p.th, c.shortcut())
+	keys.Color = col.statusFg
+	icon := func(gtx C) D { return menuIcon(gtx, c.icon) }
+	row := func(gtx C) D {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+			layout.Rigid(icon), layout.Flexed(1, label.Layout), layout.Rigid(keys.Layout))
 	}
-	return layout.Dimensions{Size: gtx.Constraints.Min}
-}
-
-func (r popupRow) content(gtx layout.Context) layout.Dimensions {
-	return layout.Inset{Top: 5, Bottom: 5, Left: 14, Right: 14}.Layout(gtx, r.labels)
-}
-
-func (r popupRow) labels(gtx layout.Context) layout.Dimensions {
-	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(r.icon),
-		layout.Flexed(1, r.label),
-		layout.Rigid(r.shortcut),
-	)
+	return layout.Inset{Top: 5, Bottom: 5, Left: 14, Right: 14}.Layout(gtx, row)
 }
 
 // menuIconW is the width of the icon column in menus, in dp.
 const menuIconW = 26
 
-// icon draws the item's icon, or leaves its space empty.
-func (r popupRow) icon(gtx layout.Context) layout.Dimensions {
+// menuIcon draws an item's icon, or leaves its space empty.
+func menuIcon(gtx C, ic *widget.Icon) D {
 	size := image.Pt(gtx.Dp(menuIconW), gtx.Dp(18))
-	ic := r.p.items[r.i].icon
-	if ic == nil {
-		return layout.Dimensions{Size: size}
+	if ic != nil {
+		gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(18), gtx.Dp(18)))
+		ic.Layout(gtx, col.statusFg)
 	}
-	gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(18), gtx.Dp(18)))
-	ic.Layout(gtx, col.statusFg)
-	return layout.Dimensions{Size: size}
-}
-
-func (r popupRow) label(gtx layout.Context) layout.Dimensions {
-	l := material.Body2(r.p.th, r.p.items[r.i].label)
-	l.Color = col.buttonFg
-	return l.Layout(gtx)
-}
-
-func (r popupRow) shortcut(gtx layout.Context) layout.Dimensions {
-	l := material.Body2(r.p.th, r.p.items[r.i].shortcut())
-	l.Color = col.statusFg
-	return l.Layout(gtx)
+	return D{Size: size}
 }

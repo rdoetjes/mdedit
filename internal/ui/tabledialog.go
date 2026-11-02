@@ -111,8 +111,8 @@ func (d *TableDialog) content(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(material.H6(d.th, "Insert Table").Layout),
 		vspace(14),
-		layout.Rigid(numberField{th: d.th, label: "Columns:", ed: &d.cols}.layout),
-		layout.Rigid(numberField{th: d.th, label: "Rows:", ed: &d.rows}.layout),
+		layout.Rigid(numberField(d.th, "Columns:", &d.cols)),
+		layout.Rigid(numberField(d.th, "Rows:", &d.rows)),
 		layout.Rigid(d.errorLine),
 		vspace(6),
 		layout.Rigid(d.buttons),
@@ -137,34 +137,18 @@ func (d *TableDialog) buttons(gtx layout.Context) layout.Dimensions {
 }
 
 // numberField is a labelled, narrow numeric input.
-type numberField struct {
-	th    *material.Theme
-	label string
-	ed    *widget.Editor
-}
-
-func (f numberField) layout(gtx layout.Context) layout.Dimensions {
-	return layout.Inset{Bottom: 10}.Layout(gtx, f.row)
-}
-
-func (f numberField) row(gtx layout.Context) layout.Dimensions {
-	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(f.caption),
-		layout.Rigid(f.input),
-	)
-}
-
-func (f numberField) caption(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min.X = gtx.Dp(90)
-	return material.Body1(f.th, f.label).Layout(gtx)
-}
-
-func (f numberField) input(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min.X = gtx.Dp(80)
-	gtx.Constraints.Max.X = gtx.Dp(80)
-	return framed(gtx, f.editor)
-}
-
-func (f numberField) editor(gtx layout.Context) layout.Dimensions {
-	return layout.UniformInset(6).Layout(gtx, material.Editor(f.th, f.ed, "").Layout)
+func numberField(th *material.Theme, label string, ed *widget.Editor) layout.Widget {
+	caption := func(gtx C) D {
+		gtx.Constraints.Min.X = gtx.Dp(90)
+		return material.Body1(th, label).Layout(gtx)
+	}
+	editor := func(gtx C) D { return layout.UniformInset(6).Layout(gtx, material.Editor(th, ed, "").Layout) }
+	input := func(gtx C) D {
+		gtx.Constraints.Min.X, gtx.Constraints.Max.X = gtx.Dp(80), gtx.Dp(80)
+		return framed(gtx, editor)
+	}
+	row := func(gtx C) D {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx, layout.Rigid(caption), layout.Rigid(input))
+	}
+	return func(gtx C) D { return layout.Inset{Bottom: 10}.Layout(gtx, row) }
 }

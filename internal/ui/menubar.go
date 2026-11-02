@@ -76,7 +76,7 @@ func (m *menuBar) titleRow(gtx layout.Context) layout.Dimensions {
 func (m *menuBar) titleFlex(gtx layout.Context) layout.Dimensions {
 	children := make([]layout.FlexChild, len(m.menus))
 	for i := range m.menus {
-		children[i] = layout.Rigid(menuTitle{m: m, i: i}.layout)
+		children[i] = layout.Rigid(func(gtx C) D { return m.title(gtx, i) })
 	}
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 }
@@ -99,49 +99,30 @@ func (m *menuBar) Overlay(gtx layout.Context, th *material.Theme, menus []*menu)
 	}
 }
 
-// menuTitle is one title in the bar.
-type menuTitle struct {
-	m *menuBar
-	i int
-}
-
-func (t menuTitle) layout(gtx layout.Context) layout.Dimensions {
-	t.m.titleX[t.i] = gtx.Dp(4) + t.leftWidths()
-	d := t.m.titles[t.i].Layout(gtx, t.body)
-	t.m.titleW[t.i] = d.Size.X
+// title lays out one title of the bar and records where it is.
+func (m *menuBar) title(gtx C, i int) D {
+	m.titleX[i] = gtx.Dp(4)
+	for _, w := range m.titleW[:i] {
+		m.titleX[i] += w
+	}
+	l := material.Body2(m.th, m.menus[i].title)
+	l.Color = col.buttonFg
+	background := func(gtx C) D { return m.titleBackground(gtx, i) }
+	label := func(gtx C) D { return layout.Inset{Top: 4, Bottom: 4, Left: 10, Right: 10}.Layout(gtx, l.Layout) }
+	d := m.titles[i].Layout(gtx, func(gtx C) D {
+		return layout.Background{}.Layout(gtx, background, label)
+	})
+	m.titleW[i] = d.Size.X
 	return d
 }
 
-// leftWidths is the total width of the titles before this one.
-func (t menuTitle) leftWidths() int {
-	w := 0
-	for _, tw := range t.m.titleW[:t.i] {
-		w += tw
-	}
-	return w
-}
-
-func (t menuTitle) body(gtx layout.Context) layout.Dimensions {
-	return layout.Background{}.Layout(gtx, t.background, t.label)
-}
-
-func (t menuTitle) background(gtx layout.Context) layout.Dimensions {
+func (m *menuBar) titleBackground(gtx C, i int) D {
 	r := image.Rectangle{Max: gtx.Constraints.Min}
 	switch {
-	case t.m.open == t.i:
+	case m.open == i:
 		fillRoundRect(gtx, col.menuOpen, r, gtx.Dp(4))
-	case t.m.titles[t.i].Hovered():
+	case m.titles[i].Hovered():
 		fillRoundRect(gtx, col.menuHover, r, gtx.Dp(4))
 	}
-	return layout.Dimensions{Size: gtx.Constraints.Min}
-}
-
-func (t menuTitle) label(gtx layout.Context) layout.Dimensions {
-	return layout.Inset{Top: 4, Bottom: 4, Left: 10, Right: 10}.Layout(gtx, t.text)
-}
-
-func (t menuTitle) text(gtx layout.Context) layout.Dimensions {
-	l := material.Body2(t.m.th, t.m.menus[t.i].title)
-	l.Color = col.buttonFg
-	return l.Layout(gtx)
+	return D{Size: gtx.Constraints.Min}
 }

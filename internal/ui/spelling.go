@@ -172,46 +172,30 @@ func (s *spellChecker) missAt(p image.Point) *spell.Miss {
 func (s *spellChecker) menuItems(m spell.Miss) []*command {
 	var items []*command
 	for _, w := range s.dict.Suggest(m.Word, maxSuggestions) {
-		items = append(items, s.a.editCommand(w, "", 0, correction{m, w}.apply))
+		items = append(items, s.a.editCommand(w, "", 0, func(st edit.State) edit.State {
+			return edit.ReplaceWord(st, m.Start, m.End, m.Word, w)
+		}))
 	}
 	if len(items) == 0 {
-		items = append(items, newCommand("No Suggestions", "", 0, doNothing))
+		items = append(items, newCommand("No Suggestions", "", 0, func(C) {}))
 	}
 	return append(items, nil,
-		newCommand("Add “"+m.Word+"” to Dictionary", "", 0, learnWord{s, m.Word, true}.run),
-		newCommand("Ignore “"+m.Word+"”", "", 0, learnWord{s, m.Word, false}.run),
+		newCommand("Add “"+m.Word+"” to Dictionary", "", 0, func(C) { s.learn(m.Word, true) }),
+		newCommand("Ignore “"+m.Word+"”", "", 0, func(C) { s.learn(m.Word, false) }),
 		nil)
 }
 
-func doNothing(layout.Context) {}
-
-// correction replaces a misspelt word with a suggestion.
-type correction struct {
-	m    spell.Miss
-	word string
-}
-
-func (c correction) apply(s edit.State) edit.State {
-	return edit.ReplaceWord(s, c.m.Start, c.m.End, c.m.Word, c.word)
-}
-
-// learnWord accepts a word from now on: for good (saved in the settings)
-// or until mdedit quits.
-type learnWord struct {
-	s    *spellChecker
-	word string
-	save bool
-}
-
-func (l learnWord) run(layout.Context) {
-	l.s.user.Add(l.word)
-	l.s.recheck()
-	if !l.save {
+// learn accepts a word from now on: for good (saved in the settings) or
+// until mdedit quits.
+func (s *spellChecker) learn(word string, save bool) {
+	s.user.Add(word)
+	s.recheck()
+	if !save {
 		return
 	}
 	st := loadSettings()
-	st.Words = append(st.Words, l.word)
-	l.s.a.saveSettings(st, "the dictionary")
+	st.Words = append(st.Words, word)
+	s.a.saveSettings(st, "the dictionary")
 }
 
 // cmdToggleSpelling shows or hides the spelling errors and remembers the

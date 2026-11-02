@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"gioui.org/layout"
 )
 
 // maxRecent is the number of recently used files in the File menu.
@@ -37,12 +35,8 @@ func (a *App) rememberRecent(p string) {
 
 // forgetRecent removes a file that no longer exists.
 func (a *App) forgetRecent(p string) {
-	a.setRecent(slices.DeleteFunc(slices.Clone(a.recent), sameFile(p).is))
+	a.setRecent(slices.DeleteFunc(slices.Clone(a.recent), func(q string) bool { return q == p }))
 }
-
-type sameFile string
-
-func (f sameFile) is(p string) bool { return p == string(f) }
 
 // setRecent changes the list and saves it; the File menu shows it the
 // next time it opens.
@@ -60,7 +54,7 @@ func (a *App) setRecent(list []string) {
 func (a *App) recentCommands() []*command {
 	var out []*command
 	for _, p := range a.recent {
-		out = append(out, newCommand(recentLabel(p), "", 0, recentFile{a, p}.run))
+		out = append(out, newCommand(recentLabel(p), "", 0, func(C) { a.openRecent(p) }))
 	}
 	return out
 }
@@ -76,18 +70,13 @@ func recentLabel(p string) string {
 	return filepath.Base(p) + "  —  " + dir
 }
 
-// recentFile opens a recent file when its menu entry is chosen.
-type recentFile struct {
-	a    *App
-	path string
-}
-
-func (r recentFile) run(layout.Context) {
-	if _, err := os.Stat(r.path); err != nil {
-		r.a.setStatus("%s no longer exists; removed from the recent files", filepath.Base(r.path))
-		r.a.forgetRecent(r.path)
+// openRecent opens a recent file, or removes it from the list if it is gone.
+func (a *App) openRecent(p string) {
+	if _, err := os.Stat(p); err != nil {
+		a.setStatus("%s no longer exists; removed from the recent files", filepath.Base(p))
+		a.forgetRecent(p)
 		return
 	}
-	r.a.flow.linkPath = r.path
-	r.a.confirmDiscard(actOpenFile)
+	a.flow.linkPath = p
+	a.confirmDiscard(actOpenFile)
 }

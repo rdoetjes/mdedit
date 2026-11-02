@@ -62,6 +62,16 @@ func (b button) primaryStyle() material.ButtonStyle {
 func vspace(dp unit.Dp) layout.FlexChild { return layout.Rigid(layout.Spacer{Height: dp}.Layout) }
 func hspace(dp unit.Dp) layout.FlexChild { return layout.Rigid(layout.Spacer{Width: dp}.Layout) }
 
+// rowBackground marks a row of a list that is selected or under the pointer.
+func rowBackground(selected bool, click *widget.Clickable) layout.Widget {
+	return func(gtx C) D {
+		if selected || click.Hovered() {
+			fillRect(gtx, col.highlightBg, image.Rectangle{Max: gtx.Constraints.Min})
+		}
+		return D{Size: gtx.Constraints.Min}
+	}
+}
+
 // hoverFill marks a button while the pointer is over it.
 func hoverFill(gtx C, click *widget.Clickable, size image.Point) {
 	if click.Hovered() {
@@ -115,15 +125,10 @@ func modal(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	area := clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops)
 	blockPointer(gtx) // swallow clicks on the col.backdrop
 	area.Pop()
-	return layout.Center.Layout(gtx, card{w}.layout)
-}
-
-// card draws its content on a col.cardBg rounded background.
-type card struct{ content layout.Widget }
-
-func (c card) layout(gtx layout.Context) layout.Dimensions {
-	gtx.Constraints.Min = image.Point{}
-	return layout.Background{}.Layout(gtx, whiteCard, c.content)
+	return layout.Center.Layout(gtx, func(gtx C) D {
+		gtx.Constraints.Min = image.Point{}
+		return layout.Background{}.Layout(gtx, whiteCard, w)
+	})
 }
 
 func whiteCard(gtx layout.Context) layout.Dimensions {

@@ -16,16 +16,8 @@ type editFunc func(edit.State) edit.State
 
 // editCommand makes a command that applies f to the editor.
 func (a *App) editCommand(label string, k key.Name, mods key.Modifiers, f editFunc) *command {
-	return newCommand(label, k, mods, editAction{a: a, f: f}.run)
+	return newCommand(label, k, mods, func(gtx C) { a.applyEdit(gtx, f) })
 }
-
-// editAction applies an edit when run.
-type editAction struct {
-	a *App
-	f editFunc
-}
-
-func (e editAction) run(gtx layout.Context) { e.a.applyEdit(gtx, e.f) }
 
 // Parameterised edits, as types whose apply method is an editFunc.
 
