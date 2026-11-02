@@ -353,7 +353,8 @@ func (a *App) about() {
 	a.dialog = &ConfirmDialog{
 		Message: "mdedit " + Version + "\n\nA Markdown editor with live preview and PDF export, written in Go with Gio.\n\n" +
 			"Copyright © 2026 Phonax-Soft. Free for non-commercial use; see the LICENSE file. " +
-			"Third-party licences: THIRD_PARTY_LICENSES.md.",
+			"Third-party licences: THIRD_PARTY_LICENSES.md. " +
+			"EU declaration of conformity: EU-declaration-of-conformity.md, once issued.",
 		Buttons: []string{"OK"},
 		Done:    a.closeDialog,
 	}

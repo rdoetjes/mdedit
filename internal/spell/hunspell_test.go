@@ -111,3 +111,10 @@ func TestSet(t *testing.T) {
 		t.Errorf("Suggest(fietz) = %q", got)
 	}
 }
+
+// Dictionaries come from a fixed commit, over HTTPS.
+func TestDictionarySourcePinned(t *testing.T) {
+	if !strings.HasPrefix(dictionarySource, "https://") || strings.Contains(dictionarySource, "/main/") {
+		t.Errorf("source %q", dictionarySource)
+	}
+}

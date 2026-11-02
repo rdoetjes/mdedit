@@ -11,6 +11,8 @@
 #   make install-desktop   install the menu entry and icons under $(PREFIX)/share
 #   make icons      redraw the PNG icons in assets/icons
 #   make licenses   regenerate THIRD_PARTY_LICENSES.md
+#   make sbom       write the software bill of materials (CycloneDX JSON)
+#   make security   scan the code and dependencies for known vulnerabilities
 #   make macos      build bin/MDEdit.app (macOS only); drag it into Applications
 #   make deps       show the system packages needed to build
 #   make wasm       build the browser version into bin/web, plus its web
@@ -37,7 +39,7 @@ LDFLAGS = -s -w -X main.version=$(VERSION)
 # someone else ("dubious ownership"), which broke sudo make install.
 
 .PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos \
-	wasm serve install-jail licenses
+	wasm serve install-jail licenses sbom security
 
 all: build
 
@@ -61,7 +63,7 @@ install: build install-desktop
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(BIN) $(DESTDIR)$(PREFIX)/bin/mdedit
 	install -d $(DESTDIR)$(PREFIX)/share/doc/mdedit
-	install -m 644 LICENSE THIRD_PARTY_LICENSES.md $(DESTDIR)$(PREFIX)/share/doc/mdedit
+	./tools/shipdocs.sh $(DESTDIR)$(PREFIX)/share/doc/mdedit
 
 uninstall: uninstall-desktop
 	rm -f $(DESTDIR)$(PREFIX)/bin/mdedit
@@ -114,6 +116,14 @@ icons:
 licenses:
 	./tools/licenses.sh
 
+# The release's SBOM belongs with its technical documentation.
+sbom:
+	$(GO) run ./tools/sbom -version $(VERSION) -o docs/cra/sbom/mdedit-$(VERSION).cdx.json
+
+# Run this on each platform: the GUI code can't be scanned for another one.
+security:
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
 # macOS application bundle.
 APP       = bin/MDEdit.app
 BUNDLE_ID ?= org.mdedit.MDEdit
@@ -123,7 +133,7 @@ macos: build
 	rm -rf $(APP) bin/mdedit.iconset
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp $(BIN) $(APP)/Contents/MacOS/mdedit
-	cp LICENSE THIRD_PARTY_LICENSES.md $(APP)/Contents/Resources/
+	./tools/shipdocs.sh $(APP)/Contents/Resources
 	sed -e 's/@VERSION@/$(VERSION)/g' -e 's/@BUNDLE_ID@/$(BUNDLE_ID)/g' assets/macos/Info.plist > $(APP)/Contents/Info.plist
 	printf 'APPL????' > $(APP)/Contents/PkgInfo
 	$(GO) run ./tools/mkicon -macos bin/mdedit.iconset
@@ -166,7 +176,7 @@ wasm:
 	if [ ! -f $$js ]; then js=$$root/misc/wasm/wasm_exec.js; fi; \
 	echo "cp $$js $(WEB)/wasm_exec.js"; cp $$js $(WEB)/wasm_exec.js
 	cp web/index.html $(WEB)/index.html
-	cp LICENSE THIRD_PARTY_LICENSES.md $(WEB)/
+	./tools/shipdocs.sh $(WEB)
 	cp assets/icons/64x64/apps/mdedit.png $(WEB)/icon.png
 	gzip -9 -k -f $(WEB)/mdedit.wasm $(WEB)/wasm_exec.js $(WEB)/index.html
 	@if command -v brotli >/dev/null 2>&1; then \

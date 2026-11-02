@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,9 +201,53 @@ func (a *App) jumpToHeading(anchor string) {
 	a.setStatus("No heading with anchor %s", anchor)
 }
 
+// openExternal opens a web or mail link. A document can come from anyone,
+// so nothing else goes to the operating system's "open": on macOS and
+// Windows that also starts programs, and other URL schemes can reach
+// any installed application.
 func (a *App) openExternal(target string) {
+	if !safeLink(target) {
+		a.setStatus("Not opened: mdedit only follows http, https and mailto links (%s)", target)
+		return
+	}
+	a.startOpen(target)
+}
+
+func (a *App) startOpen(target string) {
 	if err := openURL(target); err != nil {
 		a.setStatus("Could not open %s: %v", target, err)
+	}
+}
+
+// safeLink reports whether a link is of a kind that may be opened without
+// asking.
+func safeLink(target string) bool {
+	u, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "mailto":
+		return true
+	}
+	return false
+}
+
+// confirmOpenFile asks before opening a file that a document links to: the
+// default application of a file may run it.
+func (a *App) confirmOpenFile(p string) {
+	a.dialog = &ConfirmDialog{
+		Message: "This document links to " + filepath.Base(p) + ". Open it with its default " +
+			"application? Only do this if you trust the document: the file could be a program.",
+		Buttons: []string{"Cancel", "Open"},
+		Done:    func(choice int) { a.fileOpenAnswered(p, choice) },
+	}
+}
+
+func (a *App) fileOpenAnswered(p string, choice int) {
+	a.dialog = nil
+	if choice == 1 {
+		a.startOpen(p)
 	}
 }
 
@@ -222,7 +267,7 @@ func (a *App) openRelative(url string) {
 		a.confirmDiscard(actOpenFile)
 		return
 	}
-	a.openExternal(p)
+	a.confirmOpenFile(p)
 }
 
 func isMarkdown(p string) bool {

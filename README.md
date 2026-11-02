@@ -19,6 +19,7 @@ Free for non-commercial use; commercial use needs a licence, see
   - [In the browser (WebAssembly)](#in-the-browser-webassembly)
   - [Supported Markdown](#supported-markdown)
   - [Layout](#layout)
+  - [Security](#security)
   - [License](#license)
 
 <!-- /toc -->
@@ -315,6 +316,7 @@ images (PNG, JPEG, GIF) and backslash escapes/entities.
     internal/youtube   YouTube URLs and video IDs
     internal/imgcache  downloads and caches YouTube stills
     internal/vfs       file storage for images: the disk, or memory in the browser
+    tools/sbom         writes the software bill of materials (CycloneDX)
     internal/lint      code-style test: only short closures, ≤4 indent levels, ≤40-line functions
     tools/mkicon       draws the application icon
     tools/glyphdump    prints how a character is stored in the font (see HOW_IT_WORKS.md §6)
@@ -327,6 +329,14 @@ The preview and the PDF share `internal/render`, so both use the same layout.
 See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for how the layers fit together, how
 input flows through the code, where to add features and where to look for
 bugs.
+
+## Security
+
+Report vulnerabilities as described in [SECURITY.md](SECURITY.md). A document can
+come from anyone, so links are limited: mdedit opens http, https and mailto links,
+refuses other kinds, and asks before opening a local file other than Markdown. The
+EU Cyber Resilience Act file is in [docs/cra](docs/cra/README.md). `make security`
+scans for known vulnerabilities and `make sbom` writes the software bill of materials.
 
 ## License
 

@@ -53,8 +53,14 @@ func LanguageName(code string) string {
 
 // dictionarySource is where dictionaries are downloaded from: the
 // LibreOffice and Hunspell dictionaries collected, converted to UTF-8 and
-// licensed each under its own terms at github.com/wooorm/dictionaries.
-const dictionarySource = "https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/"
+// licensed each under its own terms at github.com/wooorm/dictionaries. It
+// names a fixed commit, over HTTPS, so what is downloaded can't change
+// without a new version of mdedit.
+const dictionarySource = "https://raw.githubusercontent.com/wooorm/dictionaries/" +
+	"8cfea406b505e4d7df52d5a19bce525df98c54ab/dictionaries/"
+
+// maxDictionaryFile limits a download; the largest real file is about 20 MB.
+const maxDictionaryFile = 64 << 20
 
 // sourceDir maps a code to its folder in the source, where they differ.
 func sourceDir(code string) string {
@@ -86,5 +92,9 @@ func fetch(code, file string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("downloading the %s dictionary: %s", LanguageName(code), resp.Status)
 	}
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDictionaryFile+1))
+	if err == nil && len(data) > maxDictionaryFile {
+		return nil, fmt.Errorf("the %s dictionary is too large", LanguageName(code))
+	}
+	return data, err
 }

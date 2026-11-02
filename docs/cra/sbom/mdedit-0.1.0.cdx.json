@@ -1,0 +1,370 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:1c1b625b-1408-4693-ac9c-d55b42c35179",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-02T07:00:56Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:generic/mdedit",
+      "name": "mdedit",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "PolyForm-Noncommercial-1.0.0"
+          }
+        }
+      ]
+    },
+    "supplier": {
+      "name": "Phonax-Soft",
+      "url": [
+        "https://github.com/rdoetjes/mdedit"
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/gioui.org@v0.10.3",
+      "name": "gioui.org",
+      "version": "v0.10.3",
+      "purl": "pkg:golang/gioui.org@v0.10.3",
+      "licenses": [
+        {
+          "expression": "Unlicense OR MIT"
+        }
+      ],
+      "pedigree": {
+        "notes": "Modified by the supplier: copy in third_party/gioui.org with the changes in third_party/gioui.org.patch (shaper cache size, line layout, hiding the caret)."
+      }
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/gioui.org/shader@v1.0.9",
+      "name": "gioui.org/shader",
+      "version": "v1.0.9",
+      "purl": "pkg:golang/gioui.org/shader@v1.0.9",
+      "licenses": [
+        {
+          "expression": "Unlicense OR MIT"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/gioui.org/x@v0.10.3",
+      "name": "gioui.org/x",
+      "version": "v0.10.3",
+      "purl": "pkg:golang/gioui.org/x@v0.10.3",
+      "licenses": [
+        {
+          "expression": "Unlicense OR MIT"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/alecthomas/chroma/v2@v2.27.0",
+      "name": "github.com/alecthomas/chroma/v2",
+      "version": "v2.27.0",
+      "purl": "pkg:golang/github.com/alecthomas/chroma/v2@v2.27.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/dlclark/regexp2/v2@v2.12.0",
+      "name": "github.com/dlclark/regexp2/v2",
+      "version": "v2.12.0",
+      "purl": "pkg:golang/github.com/dlclark/regexp2/v2@v2.12.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/go-pdf/fpdf@v0.9.0",
+      "name": "github.com/go-pdf/fpdf",
+      "version": "v0.9.0",
+      "purl": "pkg:golang/github.com/go-pdf/fpdf@v0.9.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+      "name": "github.com/go-text/typesetting",
+      "version": "v0.3.5",
+      "purl": "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+      "licenses": [
+        {
+          "expression": "Unlicense OR BSD-3-Clause"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+      "name": "github.com/godbus/dbus/v5",
+      "version": "v5.2.4",
+      "purl": "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/yuin/goldmark@v1.8.7",
+      "name": "github.com/yuin/goldmark",
+      "version": "v1.8.7",
+      "purl": "pkg:golang/github.com/yuin/goldmark@v1.8.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+      "name": "golang.org/x/exp/shiny",
+      "version": "v0.0.0-20261014143641-f0251eb4aa3e",
+      "purl": "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/image@v0.47.0",
+      "name": "golang.org/x/image",
+      "version": "v0.47.0",
+      "purl": "pkg:golang/golang.org/x/image@v0.47.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/net@v0.62.0",
+      "name": "golang.org/x/net",
+      "version": "v0.62.0",
+      "purl": "pkg:golang/golang.org/x/net@v0.62.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/sys@v0.49.0",
+      "name": "golang.org/x/sys",
+      "version": "v0.49.0",
+      "purl": "pkg:golang/golang.org/x/sys@v0.49.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/text@v0.43.0",
+      "name": "golang.org/x/text",
+      "version": "v0.43.0",
+      "purl": "pkg:golang/golang.org/x/text@v0.43.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "platform",
+      "bom-ref": "pkg:golang/stdlib@1.27.3",
+      "name": "Go toolchain and standard library",
+      "version": "1.27.3",
+      "purl": "pkg:golang/stdlib@1.27.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "data",
+      "name": "STIX Two Math",
+      "version": "2.12",
+      "description": "Maths font, embedded in internal/tex/fonts",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "data",
+      "name": "SCOWL/ESDB English word list",
+      "version": "1e5b7d3",
+      "description": "Built-in spelling dictionary (size 60), embedded in internal/spell",
+      "licenses": [
+        {
+          "license": {
+            "name": "SCOWL licence, see internal/spell/SCOWL-LICENSE.txt"
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/mdedit",
+      "dependsOn": [
+        "pkg:golang/gioui.org/shader@v1.0.9",
+        "pkg:golang/gioui.org/x@v0.10.3",
+        "pkg:golang/gioui.org@v0.10.3",
+        "pkg:golang/github.com/alecthomas/chroma/v2@v2.27.0",
+        "pkg:golang/github.com/dlclark/regexp2/v2@v2.12.0",
+        "pkg:golang/github.com/go-pdf/fpdf@v0.9.0",
+        "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+        "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+        "pkg:golang/github.com/yuin/goldmark@v1.8.7",
+        "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+        "pkg:golang/golang.org/x/image@v0.47.0",
+        "pkg:golang/golang.org/x/net@v0.62.0",
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/text@v0.43.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/gioui.org/shader@v1.0.9"
+    },
+    {
+      "ref": "pkg:golang/gioui.org/x@v0.10.3",
+      "dependsOn": [
+        "pkg:golang/gioui.org/shader@v1.0.9",
+        "pkg:golang/gioui.org@v0.10.3",
+        "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+        "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+        "pkg:golang/github.com/yuin/goldmark@v1.8.7",
+        "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+        "pkg:golang/golang.org/x/image@v0.47.0",
+        "pkg:golang/golang.org/x/net@v0.62.0",
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/text@v0.43.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/gioui.org@v0.10.3",
+      "dependsOn": [
+        "pkg:golang/gioui.org/shader@v1.0.9",
+        "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+        "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+        "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+        "pkg:golang/golang.org/x/image@v0.47.0",
+        "pkg:golang/golang.org/x/net@v0.62.0",
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/text@v0.43.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/github.com/alecthomas/chroma/v2@v2.27.0",
+      "dependsOn": [
+        "pkg:golang/github.com/dlclark/regexp2/v2@v2.12.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/github.com/dlclark/regexp2/v2@v2.12.0"
+    },
+    {
+      "ref": "pkg:golang/github.com/go-pdf/fpdf@v0.9.0",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/image@v0.47.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/github.com/go-text/typesetting@v0.3.5",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/image@v0.47.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/github.com/godbus/dbus/v5@v5.2.4",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/sys@v0.49.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/github.com/yuin/goldmark@v1.8.7"
+    },
+    {
+      "ref": "pkg:golang/golang.org/x/exp/shiny@v0.0.0-20261014143641-f0251eb4aa3e",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/image@v0.47.0",
+        "pkg:golang/golang.org/x/sys@v0.49.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/golang.org/x/image@v0.47.0",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/text@v0.43.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/golang.org/x/net@v0.62.0",
+      "dependsOn": [
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/text@v0.43.0"
+      ]
+    },
+    {
+      "ref": "pkg:golang/golang.org/x/sys@v0.49.0"
+    },
+    {
+      "ref": "pkg:golang/golang.org/x/text@v0.43.0"
+    }
+  ]
+}

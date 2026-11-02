@@ -2241,6 +2241,10 @@ for the key with `key.Filter{Focus: &a.editor, Name: …}` (see
   per family). The Go fonts keep the fixed line metrics in `pdfout/pdf.go`
   (their real ascent differs; using it would shift every existing PDF); a
   chosen font uses its own.
+- **Links are a security boundary:** a document can come from anyone, so
+  `ui/files.go: openExternal` only passes http, https and mailto to the
+  operating system, and a local file other than Markdown asks first. Don't add
+  a path around `safeLink`: on macOS and Windows "open" also starts programs.
 - **Gio is patched** (`third_party/gioui.org`, see `third_party/README.md`):
   its shaper cached only 1000 lines and laid out text in quadratic time,
   which made typing in documents over ~1000 different lines crawl; and its
