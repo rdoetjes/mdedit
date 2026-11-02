@@ -46,7 +46,7 @@ Likelihood and impact: L low, M medium, H high, before and after measures.
 | Point | Requirement | Assessment | Status |
 |---|---|---|---|
 | (1) | Appropriate level of cybersecurity based on the risks | Follows from the table above | Open until R3 and R7 close |
-| 2(a) | No known exploitable vulnerabilities | No findings on Linux, macOS and browser; scanned on every release, which a finding stops. FreeBSD by hand | Met |
+| 2(a) | No known exploitable vulnerabilities | No findings on Linux, macOS, Windows and browser; scanned on every release, which a finding stops. FreeBSD by hand | Met |
 | 2(b) | Secure by default, reset possible | No open ports on desktop, no accounts, network only on request; reset by deleting the settings folder | Met |
 | 2(c) | Security updates, automatic by default where applicable, notification, postponing | Browser: yes, by the site. Desktop: none | **Not met, B1** |
 | 2(d) | Protection from unauthorised access | No accounts or remote access in the program; files protected by the operating system. Static server holds public files only | Met for this use |

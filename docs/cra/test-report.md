@@ -13,7 +13,7 @@ holding this report. Repeat for each release.
 | Known vulnerabilities, Linux | `make security` in Ubuntu 24.04 (arm64, Docker), with the GUI libraries | No vulnerabilities found |
 | Unit and UI tests, Linux | `make test` in the same container | All packages passed |
 | Known vulnerabilities, FreeBSD | same | **Not done: run `make security` there** |
-| Release pipeline | `.github/workflows/release.yml`, checked with actionlint; Linux job run in Docker | Passed; macOS job and signing run on GitHub only, check the first run |
+| Release pipeline | `.github/workflows/release.yml`, checked with actionlint; Linux job run in Docker | Passed; macOS and Windows jobs and signing run on GitHub only, check the first run |
 | Dictionaries | `MDEDIT_DICTS=… go test ./internal/spell -run Real`, 59 dictionaries | Passed |
 | Fonts | `MDEDIT_FONTS=… go test ./internal/sysfont -run RealFonts`, 80 families, PDFs viewed | Passed |
 | Patched Gio | `go test ./text/` in `third_party/gioui.org` | Passed |
@@ -30,6 +30,6 @@ Go and modules removed them; all tests passed afterwards.
 ## Not tested
 
 No fuzzing or penetration test (B4). No test on a real Linux or FreeBSD desktop. From
-now on every push to `main` runs the tests and the scan on Linux and macOS; a failure
-stops the release. Windows isn't built or scanned any more: it isn't distributed. The scan finds only
+now on every push to `main` runs the tests on Linux and macOS and the scan on Linux,
+macOS and Windows; a failure stops the release. The scan finds only
 published vulnerabilities in dependencies, not unknown ones or flaws in mdedit's own logic.

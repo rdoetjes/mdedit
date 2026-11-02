@@ -60,8 +60,7 @@ and verified through `go.sum`; Gio as a reviewed copy in `third_party/` with
 Every change passes `make test`, including a code-style check. One person develops and
 reviews, with AI assistance; no independent review. Every push to `main` is tested,
 scanned and released by `.github/workflows/release.yml`; a failing test or a known
-vulnerability stops the release. Only Linux and the browser version are published;
-macOS builds for clients and FreeBSD builds are made by hand with `make`.
+vulnerability stops the release. FreeBSD builds are made by hand.
 
 ## 3. Risk assessment
 

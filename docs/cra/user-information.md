@@ -12,8 +12,7 @@ Single point of contact and disclosure policy: [SECURITY.md](../../SECURITY.md)
 ## Product
 
 mdedit, a Markdown editor, version shown in Help → About. Desktop program for Linux,
-FreeBSD and macOS, and a browser version. (It also builds for Windows, but no Windows
-version is distributed.)
+FreeBSD, macOS and Windows, and a browser version.
 
 ## Intended purpose and security properties
 
@@ -38,12 +37,12 @@ Security updates are free until the end of the support period: see
 
 ## Secure use
 
-- **Install** from the official source only. Linux and the browser version:
-  <https://github.com/rdoetjes/mdedit/releases>; check a download with
-  `gh attestation verify FILE --repo rdoetjes/mdedit`, or against `SHA256SUMS` in the
-  release. macOS: delivered directly by Phonax-Soft, not through the releases page. It
-  isn't signed with an Apple certificate, so macOS warns on first launch: open it once
-  with right-click → Open, after checking it came from Phonax-Soft.
+- **Install** from the official source only: <https://github.com/rdoetjes/mdedit/releases>.
+  **Check the download first** with `gh attestation verify FILE --repo rdoetjes/mdedit`,
+  or against `SHA256SUMS` in the release. mdedit isn't signed with an Apple or Microsoft
+  certificate, so the system asks once whether to allow it. Allow it only after the check
+  passed: on macOS, System Settings → Privacy & Security → Open Anyway; on Windows,
+  More info → Run anyway.
 - **Throughout use:** keep mdedit, your browser and your operating system up to date.
 - **Changes:** a build you changed yourself, including its dependencies, loses the assurances here. Changes can affect how your data is handled.
 

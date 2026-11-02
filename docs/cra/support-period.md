@@ -16,7 +16,7 @@ than that, so there is no ground for a shorter period.
 - **Expected use:** a document editor is used for years; manuscripts outlive releases.
 - **User expectations:** comparable desktop editors receive updates for years.
 - **Components:** Go supports its two latest releases, so each new Go version must be adopted; Gio is pinned and patched in `third_party`, and its fixes must be followed by hand.
-- **Operating environment:** current Linux, FreeBSD, macOS and browsers.
+- **Operating environment:** current Linux, FreeBSD, macOS, Windows and browsers.
 - **Capacity:** one person. A later successor version may take over support if users of older versions can update to it free of charge (Article 13(10)).
 
 ## Duties during the period

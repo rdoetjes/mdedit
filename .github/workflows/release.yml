@@ -1,12 +1,11 @@
-# Every push to main is tested and scanned for known vulnerabilities on Linux
-# and macOS, and built for Linux and the browser. If all of that passes, it
-# becomes a release: tag v0.N.0 (one minor version up), with an SBOM, checksums and
+# Every push to main is tested, scanned for known vulnerabilities and built for
+# Linux, macOS, Windows and the browser. If all of that passes, it becomes a
+# release: tag v0.N.0 (one minor version up), with an SBOM, checksums and
 # GitHub build attestations, which sign each file: anyone can check that it was
 # built here from this commit with
 #   gh attestation verify FILE --repo rdoetjes/mdedit
 # This is the secure distribution of updates the Cyber Resilience Act asks for
-# (docs/cra). Only Linux and the browser version are published; macOS and
-# FreeBSD are built by hand.
+# (docs/cra). FreeBSD is built by hand.
 name: release
 
 on:
@@ -74,11 +73,13 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # macOS isn't published: only tested and scanned, as it is delivered to
-  # clients directly (build it with make macos).
+  # The macOS app is signed ad hoc only (no Apple Developer ID), so macOS asks
+  # the user to allow it once; see the release notes.
   macos:
     needs: version
     runs-on: macos-15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -90,9 +91,50 @@ jobs:
         run: make test
       - name: Known vulnerabilities
         run: make security
+      - name: Build
+        run: |
+          make macos VERSION="$VERSION"
+          mkdir -p dist
+          ditto -c -k --keepParent bin/MDEdit.app "dist/mdedit-$VERSION-macos-arm64.zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos
+          path: dist/
+          if-no-files-found: error
+
+  # Not signed with a Microsoft certificate either: SmartScreen asks once.
+  windows:
+    needs: version
+    runs-on: windows-2025
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Build
+        run: |
+          mkdir -p pkg/mdedit dist
+          go build -buildvcs=false -trimpath -ldflags "-s -w -H windowsgui -X main.version=$VERSION" \
+            -o pkg/mdedit/mdedit.exe ./cmd/mdedit
+          ./tools/shipdocs.sh pkg/mdedit
+          (cd pkg && 7z a -tzip "../dist/mdedit-$VERSION-windows-amd64.zip" mdedit)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows
+          path: dist/
+          if-no-files-found: error
 
   release:
-    needs: [version, linux, macos]
+    needs: [version, linux, macos, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write     # the tag and the release
@@ -102,6 +144,11 @@ jobs:
       VERSION: ${{ needs.version.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/release-notes.md
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
@@ -115,10 +162,11 @@ jobs:
       - name: Attest the SBOM to the programs
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          subject-path: dist/*.tar.gz
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
           sbom-path: dist/mdedit-${{ needs.version.outputs.version }}.cdx.json
       - name: Release
         run: |
           gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "mdedit $VERSION" --generate-notes \
-            --notes "Verify a download: \`gh attestation verify FILE --repo $GITHUB_REPOSITORY\`, or compare it with SHA256SUMS."
+            --title "mdedit $VERSION" --notes-file .github/release-notes.md

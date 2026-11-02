@@ -334,12 +334,15 @@ bugs.
 ## Releases
 
 Every push to `main` that passes the tests and the vulnerability scan becomes a
-release on the [releases page](https://github.com/rdoetjes/mdedit/releases): the
-Linux build, the browser version, their SBOM and `SHA256SUMS`, with the version
-going up one minor step (0.1.0, 0.2.0, …). Each file is signed by GitHub; check a
-download with `gh attestation verify FILE --repo rdoetjes/mdedit`. macOS is tested
-and scanned on each push but not published; macOS and FreeBSD builds are made
-from source (`make macos`, `make`).
+release on the [releases page](https://github.com/rdoetjes/mdedit/releases): Linux,
+macOS (Apple Silicon) and Windows builds, the browser version, their SBOM and
+`SHA256SUMS`, with the version going up one minor step (0.1.0, 0.2.0, …). Each file
+is signed by GitHub; check a download with
+`gh attestation verify FILE --repo rdoetjes/mdedit`. FreeBSD is built from source.
+
+mdedit isn't signed with an Apple or Microsoft certificate, so the first start asks
+for permission once. **macOS:** open the app, click Done, then System Settings →
+Privacy & Security → **Open Anyway**. **Windows:** More info → **Run anyway**.
 
 ## Security
 
