@@ -27,16 +27,21 @@
 # every GPU-accelerated desktop application.
 
 GO      ?= go
-VERSION ?= 0.1.0
+# VERSION: empty means from the git tags (tools/version.sh); the release
+# workflow sets it.
+VERSION ?=
 PREFIX  ?= /usr/local
 BIN     ?= bin/mdedit
 # Extra build tags, e.g. TAGS=nowayland or TAGS=nox11 to drop a backend.
 TAGS    ?=
 
-LDFLAGS = -s -w -X main.version=$(VERSION)
-# -buildvcs=false: don't ask git for build information. The version comes
-# from VERSION, and git refuses to run as root in a checkout owned by
-# someone else ("dubious ownership"), which broke sudo make install.
+# The version as recipes see it, worked out by the shell (BSD and GNU make
+# alike): $$(...) in a recipe line.
+VERSIONCMD = VERSION="$(VERSION)" ./tools/version.sh
+LDFLAGS = -s -w -X main.version=$$($(VERSIONCMD))
+# -buildvcs=false: don't let go build ask git for build information: git
+# refuses to run as root in a checkout owned by someone else ("dubious
+# ownership"), which broke sudo make install. tools/version.sh allows it.
 
 .PHONY: all build run test install uninstall clean deps desktop install-desktop uninstall-desktop icons macos \
 	wasm serve install-jail licenses sbom security
@@ -47,8 +52,8 @@ build:
 	@mkdir -p bin
 	@cc="$${CC:-cc}"; \
 	if [ "$$(uname -s)" = Darwin ]; then cc=clang; fi; \
-	echo "CGO_ENABLED=1 CC=$$cc $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -o $(BIN) ./cmd/mdedit"; \
-	CGO_ENABLED=1 CC="$$cc" $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/mdedit
+	echo "CGO_ENABLED=1 CC=$$cc $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -o $(BIN) ./cmd/mdedit  (version $$($(VERSIONCMD)))"; \
+	CGO_ENABLED=1 CC="$$cc" $(GO) build -buildvcs=false -trimpath -tags '$(TAGS)' -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/mdedit
 
 run: build
 	./$(BIN) $(FILE)
@@ -118,7 +123,7 @@ licenses:
 
 # The release's SBOM belongs with its technical documentation.
 sbom:
-	$(GO) run ./tools/sbom -version $(VERSION) -o docs/cra/sbom/mdedit-$(VERSION).cdx.json
+	v=$$($(VERSIONCMD)); $(GO) run ./tools/sbom -version $$v -o docs/cra/sbom/mdedit-$$v.cdx.json
 
 # Run this on each platform: the GUI code can't be scanned for another one.
 security:
@@ -134,7 +139,7 @@ macos: build
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp $(BIN) $(APP)/Contents/MacOS/mdedit
 	./tools/shipdocs.sh $(APP)/Contents/Resources
-	sed -e 's/@VERSION@/$(VERSION)/g' -e 's/@BUNDLE_ID@/$(BUNDLE_ID)/g' assets/macos/Info.plist > $(APP)/Contents/Info.plist
+	sed -e "s/@VERSION@/$$($(VERSIONCMD) -numeric)/g" -e 's/@BUNDLE_ID@/$(BUNDLE_ID)/g' assets/macos/Info.plist > $(APP)/Contents/Info.plist
 	printf 'APPL????' > $(APP)/Contents/PkgInfo
 	$(GO) run ./tools/mkicon -macos bin/mdedit.iconset
 	iconutil -c icns -o $(APP)/Contents/Resources/mdedit.icns bin/mdedit.iconset
@@ -171,7 +176,7 @@ BROTLI_Q ?= 9
 wasm:
 	@mkdir -p $(WEB)
 	rm -f $(WEB)/*.gz $(WEB)/*.br
-	GOOS=js GOARCH=wasm $(GO) build -buildvcs=false -trimpath -ldflags '$(LDFLAGS)' -o $(WEB)/mdedit.wasm ./cmd/mdedit
+	GOOS=js GOARCH=wasm $(GO) build -buildvcs=false -trimpath -ldflags "$(LDFLAGS)" -o $(WEB)/mdedit.wasm ./cmd/mdedit
 	@root=$$($(GO) env GOROOT); js=$$root/lib/wasm/wasm_exec.js; \
 	if [ ! -f $$js ]; then js=$$root/misc/wasm/wasm_exec.js; fi; \
 	echo "cp $$js $(WEB)/wasm_exec.js"; cp $$js $(WEB)/wasm_exec.js
